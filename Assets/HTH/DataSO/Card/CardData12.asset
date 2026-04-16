@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: CardData12
   m_EditorClassIdentifier: Assembly-CSharp::HTH.CardDataSO
   cardType: 0
-  numberValue: 12
+  numberValue: 10
   operatorType: 0
   displayLabel: Q

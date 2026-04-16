@@ -1,29 +1,49 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 
 namespace HTH
 {
+    /// <summary>
+    /// ìŠ¤í…Œì´ì§€ í•˜ë‚˜ì˜ ëª¨ë“  ê·œì¹™ì„ ì •ì˜í•©ë‹ˆë‹¤.
+    /// ìŠ¤í…Œì´ì§€ë§ˆë‹¤ ë¸”ë™ì­ ê¸°ë³¸ ë£°ì— ì–´ë–¤ ìš”ì†Œê°€ ì¶”ê°€ë˜ëŠ”ì§€
+    /// í”Œë˜ê·¸ë¡œ ì œì–´í•©ë‹ˆë‹¤.
+    /// </summary>
     [CreateAssetMenu(fileName = "StageData", menuName = "Blindjack/Stage Data")]
     public class StageDataSO : ScriptableObject
     {
-        [Header("½ºÅ×ÀÌÁö ±âº» Á¤º¸")]
-        [Tooltip("Ç¥½Ã¿ë ½ºÅ×ÀÌÁö ¹øÈ£ (1-based)")]
+        [Header("ê¸°ë³¸ ì •ë³´")]
+        [Tooltip("í‘œì‹œìš© ìŠ¤í…Œì´ì§€ ë²ˆí˜¸ (1-based)")]
         public int stageIndex;
 
-        [Tooltip("±âÇÏ±Ş¼öÀûÀ¸·Î Áõ°¡ÇÏ´Â ¸ñÇ¥°ª")]
+        [Tooltip("ì´ ìŠ¤í…Œì´ì§€ì˜ ëª©í‘œ í• ë‹¹ëŸ‰")]
         public long quota;
 
-        [Header("µ¦")]
-        [Tooltip("ÇÃ·¹ÀÌ¾î¿¡°Ô µå·Î¿ìµÇ´Â Ä«µå ¹­À½")]
-        public DeckSO playerDeck;
+        [Header("ë± ì„¤ì •")]
+        [Tooltip("ì‚¬ìš©í•  ë± SO â€” Standard52 ë˜ëŠ” Custom")]
+        public DeckSO deck;
 
-        [Tooltip("µô·¯°¡ »ç¿ëÇÏ´Â Ä«µå ¹­À½")]
-        public DeckSO dealerDeck;
+        [Header("ìŠ¤í…Œì´ì§€ ê·œì¹™ í”Œë˜ê·¸")]
+        [Tooltip("true = ì—°ì‚°ì ì¹´ë“œê°€ ë±ì— í¬í•¨ë¨ (Stage 2+)")]
+        public bool useOperatorCards = false;
 
-        [Header("½Ã¾ß ¹èÆÃ ¹üÀ§ (ÃßÈÄ È°¼ºÈ­)")]
-        [Tooltip("ÇØ´ç ½ºÅ×ÀÌÁö¿¡¼­ ¹èÆÃ °¡´ÉÇÑ ½Ã¾ß ÃÖ¼Ú°ª")]
-        public float visionBetMin = 10f;
+        [Tooltip("ì—°ì‚°ì ì¹´ë“œ ë¹„ìœ¨ (ë± ì „ì²´ ëŒ€ë¹„, 0.0~1.0) useOperatorCards = trueì¼ ë•Œ ì‚¬ìš©")]
+        [Range(0f, 0.3f)]
+        public float operatorCardRatio = 0.1f;
 
-        [Tooltip("ÇØ´ç ½ºÅ×ÀÌÁö¿¡¼­ ¹èÆÃ °¡´ÉÇÑ ½Ã¾ß ÃÖ´ñ°ª")]
-        public float visionBetMax = 50f;
+        [Tooltip("true = ê¸°í•˜ê¸‰ìˆ˜ì  í• ë‹¹ëŸ‰ ì ìš© (Stage 3+)")]
+        public bool useExponentialQuota = false;
+
+        [Header("ì‹œì•¼ ë°°íŒ… ë²”ìœ„")]
+        [Tooltip("ì´ ìŠ¤í…Œì´ì§€ ìµœì†Œ ë°°íŒ…ëŸ‰")]
+        public int visionBetMin = 5;
+
+        [Tooltip("ì´ ìŠ¤í…Œì´ì§€ ìµœëŒ€ ë°°íŒ…ëŸ‰")]
+        public int visionBetMax = 50;
+
+        [Header("ë¸”ë™ì­ ê·œì¹™")]
+        [Tooltip("ë²„ìŠ¤íŠ¸ ê¸°ì¤€ê°’ â€” Stage 1: 21, ì´í›„ quotaë¡œ ëŒ€ì²´")]
+        public long bustThreshold = 21;
+
+        [Tooltip("true = Aceë¥¼ 1 ë˜ëŠ” 11 ì¤‘ ìœ ë¦¬í•œ ê°’ìœ¼ë¡œ ìë™ ê³„ì‚° (Stage 1 ë¸”ë™ì­ ë£°)")]
+        public bool useFlexibleAce = true;
     }
 }

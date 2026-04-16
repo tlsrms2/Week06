@@ -14,7 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HTH.StageDataSO
   stageIndex: 2
   quota: 42
-  playerDeck: {fileID: 11400000, guid: f5571e4df3f8e9d4690ffcf05f257447, type: 2}
-  dealerDeck: {fileID: 11400000, guid: 211c0d10621a98f4697ccee4615a1e7e, type: 2}
+  deck: {fileID: 11400000, guid: a4f839fa04da59f4aa7bf83bf4f395a9, type: 2}
+  useOperatorCards: 1
+  operatorCardRatio: 0.1
+  useExponentialQuota: 0
   visionBetMin: 10
   visionBetMax: 50
+  bustThreshold: 42
+  useFlexibleAce: 1

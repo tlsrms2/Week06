@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11b40bcdd988d1445bef8b2cf7e42476, type: 3}
+  m_Name: Stage03
+  m_EditorClassIdentifier: Assembly-CSharp::HTH.StageDataSO
+  stageIndex: 3
+  quota: 100
+  playerDeck: {fileID: 11400000, guid: 81270e08c0c7b7348b80413069808584, type: 2}
+  dealerDeck: {fileID: 11400000, guid: 18149022f2505824dbcd002a9eb191df, type: 2}
+  visionBetMin: 10
+  visionBetMax: 50

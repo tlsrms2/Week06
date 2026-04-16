@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: defad1aad675b164bb360c2ef54719a0, type: 3}
+  m_Name: Stage03Deck_Dealer
+  m_EditorClassIdentifier: Assembly-CSharp::HTH.DeckSO
+  cards:
+  - {fileID: 11400000, guid: 8188061482df3bf449caf657a7ba1416, type: 2}
+  - {fileID: 11400000, guid: 1c252d4cf223aad4a8c110fe76eba6f2, type: 2}
+  - {fileID: 11400000, guid: cbf9eec7ea8c5bf429fefb8bb444d622, type: 2}
+  - {fileID: 11400000, guid: 951ef483f97495f4aa03376c379f8ee7, type: 2}

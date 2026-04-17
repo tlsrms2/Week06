@@ -37,18 +37,25 @@ namespace HTH
         // ─── 버스트 감지 ──────────────────────────────────────────
 
         /// <summary>
-        /// 플레이어가 버스트 상태인지 확인합니다.
-        /// currentValueSet = true  : bustValue 초과 시 버스트 (높아야 하는 스테이지)
-        /// currentValueSet = false : bustValue 미달 시 버스트 (낮아야 하는 스테이지)
+        /// HIT 중 플레이어 버스트 여부를 확인합니다.
+        ///
+        /// currentValueSet = true  : 높아야 하는 스테이지
+        ///   → HIT 중 버스트 없음 (return false)
+        ///   → Stay 시 IsFinalBust로 판정
+        ///
+        /// currentValueSet = false : 낮아야 하는 스테이지 (블랙잭 기본 룰)
+        ///   → bustValue 초과 시 버스트
         /// </summary>
         public bool IsPlayerBust(List<CardDataSO> field, StageDataSO stage)
         {
             long total = EvaluatePlayer(field, stage);
 
-            return stage.currentValueSet
-                ? total > stage.bustValue   // 높아야 하는 경우 — 초과하면 버스트
-                : total < stage.bustValue;  // 낮아야 하는 경우 — 미달하면 버스트
+            if (stage.currentValueSet)
+                return false;           // 높아야 하는 스테이지 — HIT 중 버스트 없음
+            else
+                return total > stage.bustValue; // 낮아야 하는 스테이지 — 초과면 버스트
         }
+
         /// <summary>
         /// Stay 후 최종 버스트 여부를 확인합니다.
         /// currentValueSet = true  : bustValue 미만이면 실패 (목표값에 못 미침)
@@ -90,7 +97,7 @@ namespace HTH
             {
                 // 높아야 하는 스테이지
                 bool playerFail = playerTotal < stage.bustValue;
-                bool dealerFail = dealerTotal < _dealerStrategy.BustThreshold;
+                bool dealerFail = dealerTotal < stage.bustValue;
                 if (playerFail) return false;
                 if (dealerFail) return true;
                 return playerTotal >= dealerTotal; // 높을수록 유리
@@ -99,7 +106,7 @@ namespace HTH
             {
                 // 낮아야 하는 스테이지
                 bool playerBust = playerTotal > stage.bustValue;
-                bool dealerBust = dealerTotal > _dealerStrategy.BustThreshold;
+                bool dealerBust = dealerTotal > stage.bustValue;
                 if (playerBust) return false;
                 if (dealerBust) return true;
                 return playerTotal <= dealerTotal; // 낮을수록 유리

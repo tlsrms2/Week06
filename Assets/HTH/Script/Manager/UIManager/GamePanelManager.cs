@@ -41,6 +41,16 @@ namespace HTH
             => _stayButton.interactable = interactable;
 
         /// <summary>
+        /// Hit / Stay 버튼을 활성화합니다.
+        /// 재도전 또는 다음 스테이지 시작 시 호출합니다.
+        /// </summary>
+        public void EnableButtons()
+        {
+            _hitButton.interactable = true;
+            _stayButton.interactable = true;
+        }
+
+        /// <summary>
         /// Hit / Stay 버튼을 비활성화합니다.
         /// 버스트 또는 Stand 후 입력을 차단할 때 호출합니다.
         /// </summary>

@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEditor.SceneManagement;
+using UnityEngine;
 
 namespace HTH
 {
@@ -47,6 +49,22 @@ namespace HTH
 
         // ─── 상태 ─────────────────────────────────────────────────
         private GameState _state;
+        // hit 카운트
+        private int _hitCount = 0;
+
+        // 임시 보관용 리스트
+        private readonly List<CardDataSO> _pendingOperators = new();
+
+        // ─── 연출 지연 시간 ───────────────────────────────────────
+        [Header("연출 지연 시간")]
+        [Tooltip("버스트 후 결과 화면 전환까지 대기 시간 (초)")]
+        [SerializeField] private float _bustDelay = 1.5f;
+
+        [Tooltip("Stay 후 딜러 턴 전환까지 대기 시간 (초)")]
+        [SerializeField] private float _standDelay = 1.0f;
+
+        [Tooltip("딜러 턴 종료 후 결과 화면까지 대기 시간 (초)")]
+        [SerializeField] private float _resultDelay = 1.5f;
 
         // ─── 생명주기 ─────────────────────────────────────────────
 
@@ -266,6 +284,9 @@ namespace HTH
             if (_dealerStrategy is DealerAI ai)
                 ai.SetBustThreshold(_stageManager.CurrentStage.bustValue);
 
+            // 재도전/다음 스테이지 진입 시 버튼 재활성화
+            _gameUI.EnableGameButtons();
+
             // 패널 진입 시 딜러/플레이어 UI 초기화
             _gameUI?.RefreshDealerArea(_dealerManager.Field);
             _gameUI?.RefreshPlayerArea(
@@ -302,6 +323,12 @@ namespace HTH
         /// </summary>
         private void DealInitialCards()
         {
+            if (_stageManager.CurrentStage.operatorOnlyHit)
+            {
+                DealAllNumberCards();
+                return;
+            }
+
             // 1. 플레이어 첫 번째 카드
             CardDataSO p1 = DrawNumberCard();
             if (p1 != null) _playerHandManager.AddNumberToField(p1);
@@ -318,6 +345,38 @@ namespace HTH
             CardDataSO d2 = DrawNumberCard();
             if (d2 != null) _dealerManager.SetHiddenCard(d2);
         }
+        /// <summary>
+        /// operatorOnlyHit 스테이지 전용 초기 딜링.
+        /// 덱의 숫자 카드를 전부 플레이어 필드에 지급하고
+        /// 연산자 카드는 덱에 남겨둡니다.
+        /// </summary>
+        private void DealAllNumberCards()
+        {
+            // 덱에서 숫자 카드만 전부 꺼내 플레이어 필드에 지급
+            while (_deckRunner.Remaining > 0)
+            {
+                if (!_deckRunner.TryDraw(out CardDataSO card)) break;
+
+                if (card.cardType == CardType.Number)
+                    _playerHandManager.AddNumberToField(card);
+                else
+                {
+                    // 연산자 카드는 다시 덱에 넣어야 하는데
+                    // Queue는 순서가 있으므로 별도 보관
+                    _pendingOperators.Add(card);
+                }
+            }
+
+            // 연산자 카드를 덱에 재삽입
+            foreach (var op in _pendingOperators)
+                _deckRunner.ReturnCard(op);
+            _pendingOperators.Clear();
+
+            Debug.Log($"[GM] DealAllNumberCards — " +
+                      $"플레이어필드:{_playerHandManager.Field.Count} " +
+                      $"연산자덱:{_deckRunner.Remaining}");
+        }
+
         /// <summary>
         /// 숫자 카드가 나올 때까지 덱에서 드로우합니다.
         /// 연산자 카드는 건너뛰고 재드로우합니다.
@@ -407,6 +466,15 @@ namespace HTH
         /// </summary>
         private void DrawAndProcess(int retryCount = 0)
         {
+            var stage = _stageManager.CurrentStage;
+
+            if (stage.maxHitCount > 0 && _hitCount >= stage.maxHitCount)
+            {
+                Debug.Log($"[GM] 최대 Hit 횟수 초과 ({stage.maxHitCount}회) — Stand 전환");
+                OnStand();
+                return;
+            }
+
             if (retryCount > 10)
             {
                 Debug.LogWarning("[GM] DrawAndProcess — 재드로우 한도 초과");
@@ -425,13 +493,22 @@ namespace HTH
 
             if (card.cardType == CardType.Number)
             {
+                // operatorOnlyHit 스테이지에서는 숫자 카드가 나오면 안 됨
+                // 나왔다면 반환 후 재드로우
+                if (stage.operatorOnlyHit)
+                {
+                    _deckRunner.ReturnCard(card);
+                    Debug.Log("[GM] operatorOnlyHit — 숫자 카드 반환 후 재드로우");
+                    DrawAndProcess(retryCount + 1);
+                    return;
+                }
+
+                _hitCount++;
                 // OnFieldChanged 이벤트 일시 차단
                 _playerHandManager.OnFieldChanged -= OnPlayerFieldChanged;
-
                 _playerHandManager.AddNumberToField(card);
 
-                bool bust = _blackjackManager.IsPlayerBust(
-                    _playerHandManager.Field, _stageManager.CurrentStage);
+                bool bust = _blackjackManager.IsPlayerBust(_playerHandManager.Field, _stageManager.CurrentStage);
 
                 Debug.Log($"[GM] Hit — total:{_blackjackManager.EvaluatePlayer(_playerHandManager.Field, _stageManager.CurrentStage)} " +
                           $"bustValue:{_stageManager.CurrentStage.bustValue} " +
@@ -448,24 +525,41 @@ namespace HTH
 
                     Debug.Log("[GM] 플레이어 버스트 — Result 전환");
                     ExitPlayerTurn();
-                    TransitionTo(GameState.Result);
+                    StartCoroutine(DelayedTransition(_bustDelay, GameState.Result));
                     return;
                 }
 
                 // 버스트 아닐 때 이벤트 재구독 후 UI 갱신
                 _playerHandManager.OnFieldChanged += OnPlayerFieldChanged;
                 UI_RefreshPlayerArea();
+
+                if(stage.maxHitCount > 0 && _hitCount >= stage.maxHitCount)
+                {
+                    Debug.Log($"[GM] Hit 한도 도달 - Hit 버튼 비활성화");
+                    _gameUI?.DisableGameButtons();
+                }
             }
             else
             {
-                if (_stageManager.CurrentStage.useOperatorCards)
+                if (stage.useOperatorCards || stage.operatorOnlyHit)
+                {
+                    _hitCount++;
                     _playerHandManager.AddOperatorToHand(card);
+
+                    // 연산자 한도 체크
+                    if (stage.maxHitCount > 0 && _hitCount >= stage.maxHitCount)
+                    {
+                        Debug.Log("[GM] 연산자 Hit 한도 도달 — 버튼 비활성화");
+                        _gameUI?.DisableGameButtons();
+                    }
+                }
                 else
                 {
                     Debug.Log("[GM] Stage1 연산자 카드 스킵 — 재드로우");
                     DrawAndProcess(retryCount + 1);
                 }
             }
+
         }
 
         /// <summary>
@@ -482,12 +576,12 @@ namespace HTH
                 UI_RefreshPlayerArea();
                 Debug.Log("[GM] Stay — 최종 미달 버스트");
                 ExitPlayerTurn();
-                TransitionTo(GameState.Result);
+                StartCoroutine(DelayedTransition(_bustDelay, GameState.Result));
                 return;
             }
 
             ExitPlayerTurn();
-            TransitionTo(GameState.DealerTurn);
+            StartCoroutine(DelayedTransition(_standDelay, GameState.DealerTurn));
         }
 
         /// <summary>
@@ -500,6 +594,17 @@ namespace HTH
                 _gameUI?.PlaceOperatorOnSlot(slotIndex, placed.operatorType);
         }
 
+        /// <summary>
+        /// 지정 시간 후 상태를 전환합니다.
+        /// 버스트 / Stay / 결과 연출 지연에 사용합니다.
+        /// </summary>
+        private System.Collections.IEnumerator DelayedTransition(
+            float delay, GameState next)
+        {
+            yield return new WaitForSeconds(delay);
+            TransitionTo(next);
+        }
+
         // ─── 이벤트 핸들러 ───────────────────────────────────────
 
         /// <summary>PlayerHandManager.OnFieldChanged 핸들러 — 플레이어 UI 갱신</summary>
@@ -509,7 +614,7 @@ namespace HTH
         private void OnDealerFieldChanged() => UI_RefreshDealerArea();
 
         /// <summary>DealerManager.OnDealerTurnEnded 핸들러 — Result 상태로 전환</summary>
-        private void OnDealerTurnEnded() => TransitionTo(GameState.Result);
+        private void OnDealerTurnEnded() => StartCoroutine(DelayedTransition(_resultDelay, GameState.Result));
 
         /// <summary>VisionManager.OnVisionDepleted 핸들러 — 시야 소진 시 GameOver 전환</summary>
         private void OnVisionDepleted() => TransitionTo(GameState.GameOver);
@@ -595,6 +700,8 @@ namespace HTH
         /// </summary>
         private void LoadStage()
         {
+            _hitCount = 0;
+
             _playerHandManager.ResetAll();
             _dealerManager.ResetField();
             _deckRunner = new DeckRunner(

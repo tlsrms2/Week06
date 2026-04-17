@@ -82,10 +82,7 @@ namespace HTH
         /// 비공개 카드를 먼저 공개한 뒤 ShouldHit 조건을 만족하는 동안 드로우합니다.
         /// Stage 2+에서는 드로우한 연산자 카드를 AI가 자동 배치합니다.
         /// </summary>
-        public IEnumerator RunTurn(
-            DeckRunner deckRunner,
-            IDealerStrategy dealerStrategy,
-            StageDataSO stage)
+        public IEnumerator RunTurn(DeckRunner deckRunner, IDealerStrategy dealerStrategy, StageDataSO stage)
         {
             // 비공개 카드 공개
             RevealHiddenCard();
@@ -97,10 +94,11 @@ namespace HTH
                 if (stage.useOperatorCards && Hand.Count > 0)
                     TryAutoPlaceOperator(dealerStrategy, stage);
 
-                long total = ExpressionEvaluator.Evaluate(
-                    Field,
-                    stage.useFlexibleAce,
-                    stage.bustValue);
+                long total = ExpressionEvaluator.Evaluate(Field, stage.useFlexibleAce, stage.bustValue);
+
+                // 딜러 버스트 즉시 중단
+                if (stage.currentValueSet && total > stage.bustValue) break;
+                if (!stage.currentValueSet && total <= stage.bustValue) break;
 
                 if (!dealerStrategy.ShouldHit(total, stage)) break;
                 if (!deckRunner.TryDraw(out CardDataSO card)) break;

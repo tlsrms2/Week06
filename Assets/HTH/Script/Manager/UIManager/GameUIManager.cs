@@ -169,6 +169,9 @@ namespace HTH
         public void RemoveFromHand(int index)
             => _handUIManager.RemoveFromHand(index);
 
+        /// <summary>게임 패널 버튼을 활성화합니다.</summary>
+        public void EnableGameButtons()
+            => _gamePanelManager.EnableButtons();
         /// <summary>게임 패널 버튼을 비활성화합니다.</summary>
         public void DisableGameButtons()
             => _gamePanelManager.DisableButtons();

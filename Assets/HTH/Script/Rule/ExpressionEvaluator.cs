@@ -116,6 +116,7 @@ namespace HTH
         }
 
         /// <summary>CardDataSO 리스트를 숫자/연산자 리스트로 분리합니다.</summary>
+        // ExpressionEvaluator.SplitExpression 내부 로그 추가
         private static void SplitExpression(List<CardDataSO> expression, out List<int> numbers, out List<OperatorType> operators)
         {
             numbers = new List<int>();
@@ -127,9 +128,14 @@ namespace HTH
             {
                 if (card.cardType == CardType.Number)
                 {
-                    //J/Q/K는 10으로 처리
-                    numbers.Add(card.BlackjackValue);
+                    int val = card.BlackjackValue;
 
+                    // ← 로그 추가
+                    UnityEngine.Debug.Log($"[Evaluator] 카드:{card.displayLabel} " +
+                                          $"numberValue:{card.numberValue} " +
+                                          $"BlackjackValue:{val}");
+
+                    numbers.Add(val);
                     if (numbers.Count > 1) operators.Add(pendingOp);
                     pendingOp = OperatorType.None;
                 }
@@ -138,6 +144,10 @@ namespace HTH
                     pendingOp = card.operatorType;
                 }
             }
+
+            // ← 최종 리스트 로그
+            UnityEngine.Debug.Log($"[Evaluator] numbers:[{string.Join(",", numbers)}] " +
+                                  $"operators:[{string.Join(",", operators)}]");
         }
 
         /// <summary>left op right를 계산합니다. 0 나누기 방어 포함.</summary>

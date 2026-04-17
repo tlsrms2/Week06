@@ -30,7 +30,7 @@
                 return currentTotal < stage.bustValue * 0.8f;
             else
                 // 낮아야 함 → bustValue의 60% 초과면 더 드로우 (낮추려고 뺄셈/나눗셈 사용)
-                return currentTotal > stage.bustValue * 0.6f;
+                return currentTotal > stage.bustValue;
         }
 
         /// <summary>승패 결과 설명 문자열을 반환합니다.</summary>

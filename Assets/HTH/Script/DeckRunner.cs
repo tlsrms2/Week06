@@ -79,6 +79,20 @@ namespace HTH
             }
         }
 
+        /// <summary>
+        /// 카드를 덱 앞쪽에 반환합니다.
+        /// operatorOnlyHit 스테이지에서 연산자 카드를 재삽입할 때 사용합니다.
+        /// </summary>
+        public void ReturnCard(CardDataSO card)
+        {
+            // Queue는 앞쪽 삽입이 불가하므로 새 Queue로 재구성
+            var temp = new Queue<CardDataSO>();
+            temp.Enqueue(card);
+            while (_queue.Count > 0)
+                temp.Enqueue(_queue.Dequeue());
+            _queue = temp;
+        }
+
         /// <summary>Fisher-Yates 셔플</summary>
         private void Shuffle(List<CardDataSO> cards)
         {

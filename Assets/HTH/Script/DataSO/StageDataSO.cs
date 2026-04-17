@@ -17,6 +17,14 @@ namespace HTH
         [Tooltip("이 스테이지의 목표 할당량")]
         public long bustValue;
 
+        [Header("드로우 제한")]
+        [Tooltip("플레이어 최대 Hit 횟수 — 0이면 덱 소진까지 무제한")]
+        public int maxHitCount = 0;
+
+        [Header("드로우 설정")]
+        [Tooltip("true = Hit 시 연산자 카드만 드로우 (숫자는 초기 딜링으로 모두 지급)")]
+        public bool operatorOnlyHit = false;
+
         [Header("덱 설정")]
         [Tooltip("사용할 덱 SO — Standard52 또는 Custom")]
         public DeckSO deck;

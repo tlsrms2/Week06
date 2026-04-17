@@ -85,15 +85,22 @@ namespace HTH
 
         /// <summary>
         /// 연산자를 필드 슬롯에 배치합니다.
-        /// 손패 카드가 선택된 상태에서만 동작합니다.
-        /// 이미 배치된 슬롯은 무시합니다.
+        /// slotIndex는 숫자 카드 기준 인덱스입니다.
+        /// (슬롯0 = 첫번째와 두번째 숫자 사이)
         /// </summary>
         public bool TryPlaceOperator(int slotIndex, out CardDataSO placedCard)
         {
             placedCard = null;
 
             if (_selectedHandIndex < 0) return false;
-            if (slotIndex < 0 || slotIndex >= Field.Count - 1) return false;
+
+            // 숫자 카드 개수로 유효 슬롯 범위 확인
+            int numberCount = 0;
+            foreach (var card in Field)
+                if (card.cardType == CardType.Number) numberCount++;
+
+            // 슬롯은 숫자 카드 사이마다 하나 → 최대 numberCount - 1개
+            if (slotIndex < 0 || slotIndex >= numberCount - 1) return false;
             if (_placedOperators.ContainsKey(slotIndex)) return false;
 
             placedCard = Hand[_selectedHandIndex];
@@ -113,10 +120,13 @@ namespace HTH
 
         /// <summary>
         /// _placedOperators를 반영해 Field를 재구성합니다.
-        /// 숫자 카드 사이에 배치된 연산자를 끼워넣습니다.
+        /// 숫자 카드 사이 슬롯 인덱스(0부터 시작)에 연산자를 끼워넣습니다.
+        /// 슬롯0 = 숫자[0]과 숫자[1] 사이
+        /// 슬롯1 = 숫자[1]과 숫자[2] 사이
         /// </summary>
         private void RebuildFieldExpression()
         {
+            // 현재 Field에서 숫자 카드만 추출
             var numberCards = new List<CardDataSO>();
             foreach (var card in Field)
                 if (card.cardType == CardType.Number)
@@ -125,11 +135,19 @@ namespace HTH
             Field.Clear();
             for (int i = 0; i < numberCards.Count; i++)
             {
-                if (i > 0 && _placedOperators.TryGetValue(i - 1, out CardDataSO op))
-                    Field.Add(op);
-
                 Field.Add(numberCards[i]);
+
+                // 이 숫자와 다음 숫자 사이 슬롯에 연산자가 있으면 삽입
+                if (i < numberCards.Count - 1 &&
+                    _placedOperators.TryGetValue(i, out CardDataSO op))
+                    Field.Add(op);
             }
+
+            // 디버그 로그
+            var log = new System.Text.StringBuilder("[PHM] RebuildField — ");
+            foreach (var card in Field)
+                log.Append($"{card.displayLabel} ");
+            UnityEngine.Debug.Log(log.ToString());
         }
 
         // ─── 선택 해제 ────────────────────────────────────────────

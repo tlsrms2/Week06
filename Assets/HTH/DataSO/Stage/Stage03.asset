@@ -13,11 +13,12 @@ MonoBehaviour:
   m_Name: Stage03
   m_EditorClassIdentifier: Assembly-CSharp::HTH.StageDataSO
   stageIndex: 3
-  quota: 100
+  bustValue: 0
   deck: {fileID: 11400000, guid: a4f839fa04da59f4aa7bf83bf4f395a9, type: 2}
   useOperatorCards: 1
   operatorCardRatio: 0.15
   useExponentialQuota: 1
   visionBetMin: 15
   visionBetMax: 50
-  bustThreshold: 5000
+  currentValueSet: 0
+  useFlexibleAce: 0

@@ -84,11 +84,8 @@ namespace HTH
         /// 현재 필드 연산값 텍스트를 갱신합니다.
         /// 할당량 초과 시 빨간색, 일치 시 금색, 정상 시 흰색입니다.
         /// </summary>
-        public void UpdateCurrentValue(
-            List<CardDataSO> field,
-            long quota = 0,
-            bool flexibleAce = false,
-            long bustThreshold = 21)
+        public void UpdateCurrentValue(List<CardDataSO> field, long quota = 0, bool flexibleAce = false,
+            long bustThreshold = 21, bool currentValueSet = true)
         {
             if (_currentValueText == null) return;
 
@@ -99,16 +96,29 @@ namespace HTH
                 return;
             }
 
-            long value = ExpressionEvaluator.Evaluate(
-                field, flexibleAce, bustThreshold);
+            long value = ExpressionEvaluator.Evaluate(field, flexibleAce, bustThreshold);
             _currentValueText.text = $"= {value:N0}";
 
-            if (quota > 0 && value > quota)
-                _currentValueText.color = UIColor.Hex("#F44336");
-            else if (quota > 0 && value == quota)
-                _currentValueText.color = UIColor.Hex("#FFD700");
+            if (currentValueSet)
+            {
+                // 높아야 하는 스테이지 — 초과 시 빨강
+                if (quota > 0 && value > quota)
+                    _currentValueText.color = UIColor.Hex("#F44336");
+                else if (quota > 0 && value == quota)
+                    _currentValueText.color = UIColor.Hex("#FFD700");
+                else
+                    _currentValueText.color = UIColor.Hex("#E8E0D0");
+            }
             else
-                _currentValueText.color = UIColor.Hex("#E8E0D0");
+            {
+                // 낮아야 하는 스테이지 — 미달 시 빨강
+                if (quota > 0 && value > quota)
+                    _currentValueText.color = UIColor.Hex("#F44336");
+                else if (quota > 0 && value == quota)
+                    _currentValueText.color = UIColor.Hex("#FFD700");
+                else
+                    _currentValueText.color = UIColor.Hex("#E8E0D0");
+            }
         }
 
         // ─── ResultPanel ──────────────────────────────────────────

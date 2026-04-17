@@ -15,10 +15,7 @@ namespace HTH
         /// CardDataSO 리스트를 좌→우로 순차 연산합니다.
         /// useFlexibleAce = true면 Ace를 버스트 없이 최대값이 되도록 자동 선택합니다.
         /// </summary>
-        public static long Evaluate(
-            List<CardDataSO> expression,
-            bool useFlexibleAce = false,
-            long bustThreshold = 21)
+        public static long Evaluate(List<CardDataSO> expression, bool useFlexibleAce = false, long bustThreshold = 21)
         {
             if (expression == null || expression.Count == 0) return 0;
 
@@ -72,10 +69,7 @@ namespace HTH
         /// Ace를 11로 바꿔도 bustThreshold를 초과하지 않으면 11로 적용합니다.
         /// 여러 Ace가 있을 경우 각각 독립적으로 판단합니다.
         /// </summary>
-        private static long EvaluateWithFlexibleAce(
-            List<int> numbers,
-            List<OperatorType> operators,
-            long bustThreshold)
+        private static long EvaluateWithFlexibleAce(List<int> numbers, List<OperatorType> operators, long bustThreshold)
         {
             // 1단계: 모든 Ace를 1로 계산
             long baseResult = EvaluateSplit(numbers, operators);
@@ -106,9 +100,7 @@ namespace HTH
         }
 
         /// <summary>분리된 숫자/연산자를 좌→우로 계산합니다.</summary>
-        private static long EvaluateSplit(
-            List<int> numbers,
-            List<OperatorType> operators)
+        private static long EvaluateSplit(List<int> numbers,List<OperatorType> operators)
         {
             if (numbers.Count == 0) return 0;
 
@@ -124,10 +116,7 @@ namespace HTH
         }
 
         /// <summary>CardDataSO 리스트를 숫자/연산자 리스트로 분리합니다.</summary>
-        private static void SplitExpression(
-            List<CardDataSO> expression,
-            out List<int> numbers,
-            out List<OperatorType> operators)
+        private static void SplitExpression(List<CardDataSO> expression, out List<int> numbers, out List<OperatorType> operators)
         {
             numbers = new List<int>();
             operators = new List<OperatorType>();
@@ -138,7 +127,9 @@ namespace HTH
             {
                 if (card.cardType == CardType.Number)
                 {
-                    numbers.Add(card.numberValue);
+                    //J/Q/K는 10으로 처리
+                    numbers.Add(card.BlackjackValue);
+
                     if (numbers.Count > 1) operators.Add(pendingOp);
                     pendingOp = OperatorType.None;
                 }

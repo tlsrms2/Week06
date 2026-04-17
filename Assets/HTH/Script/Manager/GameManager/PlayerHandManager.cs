@@ -17,7 +17,7 @@ namespace HTH
         private readonly Dictionary<int, CardDataSO> _placedOperators = new();
         private int _selectedHandIndex = -1;
 
-        // ─── 이벤트 ──────────────────────────────────────────────
+        // ─── 이벤트 ──────────────────────────────────────────────\
         /// <summary>필드/손패 변경 시 발행 — GameManager가 UI 갱신에 사용</summary>
         public event System.Action OnFieldChanged;
 
@@ -26,6 +26,7 @@ namespace HTH
 
         /// <summary>슬롯 하이라이트 요청 시 발행 (true=하이라이트, false=해제)</summary>
         public event System.Action<bool> OnSlotHighlightRequested;
+
 
         // ─── 초기화 ───────────────────────────────────────────────
 
@@ -41,8 +42,7 @@ namespace HTH
         // ─── 카드 추가 ────────────────────────────────────────────
 
         /// <summary>
-        /// 숫자 카드를 필드에 추가합니다.
-        /// GameManager의 OnHit에서 호출합니다.
+        /// 카드를 필드에 추가합니다.
         /// </summary>
         public void AddNumberToField(CardDataSO card)
         {

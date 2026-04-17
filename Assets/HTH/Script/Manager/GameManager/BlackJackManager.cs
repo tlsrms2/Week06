@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 
 namespace HTH
@@ -27,63 +28,108 @@ namespace HTH
         /// FlexibleAce / bustThreshold를 StageDataSO에서 읽습니다.
         /// </summary>
         public long EvaluatePlayer(List<CardDataSO> field, StageDataSO stage)
-            => ExpressionEvaluator.Evaluate(
-                field, stage.useFlexibleAce, stage.bustThreshold);
+            => ExpressionEvaluator.Evaluate(field, stage.useFlexibleAce, stage.bustValue);
 
         /// <summary>딜러 필드를 연산합니다.</summary>
         public long EvaluateDealer(List<CardDataSO> field, StageDataSO stage)
-            => ExpressionEvaluator.Evaluate(
-                field, stage.useFlexibleAce, stage.bustThreshold);
+            => ExpressionEvaluator.Evaluate(field, stage.useFlexibleAce, stage.bustValue);
 
         // ─── 버스트 감지 ──────────────────────────────────────────
 
-        /// <summary>플레이어가 버스트 상태인지 확인합니다.</summary>
+        /// <summary>
+        /// 플레이어가 버스트 상태인지 확인합니다.
+        /// currentValueSet = true  : bustValue 초과 시 버스트 (높아야 하는 스테이지)
+        /// currentValueSet = false : bustValue 미달 시 버스트 (낮아야 하는 스테이지)
+        /// </summary>
         public bool IsPlayerBust(List<CardDataSO> field, StageDataSO stage)
-            => EvaluatePlayer(field, stage) > stage.bustThreshold;
+        {
+            long total = EvaluatePlayer(field, stage);
+
+            return stage.currentValueSet
+                ? total > stage.bustValue   // 높아야 하는 경우 — 초과하면 버스트
+                : total < stage.bustValue;  // 낮아야 하는 경우 — 미달하면 버스트
+        }
+        /// <summary>
+        /// Stay 후 최종 버스트 여부를 확인합니다.
+        /// currentValueSet = true  : bustValue 미만이면 실패 (목표값에 못 미침)
+        /// currentValueSet = false : bustValue 초과면 실패 (목표값을 넘김)
+        /// IsPlayerBust와 달리 Stay 확정 시점에만 호출합니다.
+        /// </summary>
+        public bool IsFinalBust(List<CardDataSO> field, StageDataSO stage)
+        {
+            long total = EvaluatePlayer(field, stage);
+
+            return stage.currentValueSet
+                ? total < stage.bustValue   // 높아야 함 → 미만이면 실패
+                : total > stage.bustValue;  // 낮아야 함 → 초과면 실패
+        }
 
         // ─── 승패 판정 ────────────────────────────────────────────
 
         /// <summary>
         /// 스테이지 룰에 따라 승패를 판정합니다.
-        /// Stage 1 : 표준 블랙잭 (21 기준, 플레이어 vs 딜러)
-        /// Stage 2+ : 할당량 기준 (quota 초과 여부)
+        ///
+        /// Stage 1 (표준 블랙잭)
+        ///   - 21 초과 → 플레이어 버스트 패배
+        ///   - 딜러 21 초과 → 딜러 버스트 승리
+        ///   - 플레이어 >= 딜러 → 승리
+        ///
+        /// Stage 2+ currentValueSet = true (높아야 하는 스테이지)
+        ///   - bustValue 미만 → 패배
+        ///   - 딜러 bustValue 미만 → 딜러 실패 → 승리
+        ///   - 플레이어 >= 딜러 → 승리
+        ///
+        /// Stage 2+ currentValueSet = false (낮아야 하는 스테이지)
+        ///   - bustValue 초과 → 패배
+        ///   - 딜러 bustValue 초과 → 딜러 버스트 → 승리
+        ///   - 플레이어 <= 딜러 → 승리 (낮을수록 유리)
         /// </summary>
-        public bool JudgeResult(
-            long playerTotal,
-            long dealerTotal,
-            StageDataSO stage)
+        public bool JudgeResult(long playerTotal, long dealerTotal, StageDataSO stage)
         {
-            bool playerBust = playerTotal > stage.quota;
-            bool dealerBust = dealerTotal > _dealerStrategy.BustThreshold;
-            if (playerBust) return false;
-            if (dealerBust) return true;
-            return playerTotal >= dealerTotal;
-        }
-
-        /// <summary>결과 설명 문자열을 생성합니다.</summary>
-        public string BuildResultDescription(
-            long playerTotal,
-            long dealerTotal,
-            StageDataSO stage,
-            bool win)
-        {
-            if (stage.stageIndex == 1)
+            if (stage.currentValueSet)
             {
-                if (playerTotal > 21)
-                    return $"버스트! {playerTotal:N0} > 21";
-                if (dealerTotal > 21)
-                    return $"딜러 버스트! 딜러: {dealerTotal:N0}";
+                // 높아야 하는 스테이지
+                bool playerFail = playerTotal < stage.bustValue;
+                bool dealerFail = dealerTotal < _dealerStrategy.BustThreshold;
+                if (playerFail) return false;
+                if (dealerFail) return true;
+                return playerTotal >= dealerTotal; // 높을수록 유리
+            }
+            else
+            {
+                // 낮아야 하는 스테이지
+                bool playerBust = playerTotal > stage.bustValue;
+                bool dealerBust = dealerTotal > _dealerStrategy.BustThreshold;
+                if (playerBust) return false;
+                if (dealerBust) return true;
+                return playerTotal <= dealerTotal; // 낮을수록 유리
+            }
+        }
+        /// <summary>결과 설명 문자열을 생성합니다.</summary>
+        public string BuildResultDescription(long playerTotal, long dealerTotal, StageDataSO stage, bool win)
+        {
+
+            if (stage.currentValueSet)
+            {
+                // 높아야 하는 스테이지
+                if (playerTotal < stage.bustValue)
+                    return $"미달! {playerTotal:N0} < {stage.bustValue:N0}";
+                if (dealerTotal < stage.bustValue)
+                    return $"딜러 미달! — 플레이어 승리";
                 return win
                     ? $"승리! {playerTotal:N0} ≥ {dealerTotal:N0}"
                     : $"패배. {playerTotal:N0} < {dealerTotal:N0}";
             }
             else
             {
-                if (playerTotal > stage.quota)
-                    return $"버스트! {playerTotal:N0} > {stage.quota:N0}";
+                // 낮아야 하는 스테이지
+                if (playerTotal > stage.bustValue)
+                    return $"버스트! {playerTotal:N0} > {stage.bustValue:N0}";
+                if (dealerTotal > stage.bustValue)
+                    return $"딜러 버스트! — 플레이어 승리";
                 return win
-                    ? $"성공! {playerTotal:N0} ≤ {stage.quota:N0}"
-                    : $"실패. {playerTotal:N0} > {stage.quota:N0}";
+                    ? $"성공! {playerTotal:N0} ≤ {dealerTotal:N0}"
+                    : $"실패. {playerTotal:N0} > {dealerTotal:N0}";
             }
         }
 

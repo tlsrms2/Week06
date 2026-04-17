@@ -39,5 +39,15 @@ namespace HTH
         /// </summary>
         public void SetStayInteractable(bool interactable)
             => _stayButton.interactable = interactable;
+
+        /// <summary>
+        /// Hit / Stay 버튼을 비활성화합니다.
+        /// 버스트 또는 Stand 후 입력을 차단할 때 호출합니다.
+        /// </summary>
+        public void DisableButtons()
+        {
+            _hitButton.interactable = false;
+            _stayButton.interactable = false;
+        }
     }
 }

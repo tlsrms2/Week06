@@ -25,15 +25,6 @@ namespace HTH
 
         private Color _defaultColor;
 
-        // ─── 생명주기 ─────────────────────────────────────────────
-        private void Awake()
-        {
-            _image = GetComponent<Image>();
-            _button = GetComponent<Button>();
-
-            _button.onClick.AddListener(() => OnClicked?.Invoke(this));
-        }
-
         // ─── ICardView 구현 ───────────────────────────────────────
 
         /// <summary>
@@ -44,8 +35,16 @@ namespace HTH
         {
             Data = data;
 
-            if (_label == null)
-                _label = GetComponentInChildren<TextMeshProUGUI>();
+            if (_label == null) _label = GetComponentInChildren<TextMeshProUGUI>();
+
+            if(_image == null) _image = GetComponent<Image>();
+
+            if (_button == null)
+            {
+                _button = GetComponent<Button>();
+                _button.onClick.AddListener(() => OnClicked?.Invoke(this));
+            }
+
             // 앞면 텍스처가 있으면 텍스트 숨김
             // 없으면 displayLabel 텍스트로 임시 표시
             if (data.HasFrontTexture)
@@ -73,9 +72,7 @@ namespace HTH
                 }
             }
 
-            _defaultColor = data.cardType == CardType.Number
-                ? UIColor.CardNumBg
-                : UIColor.CardOpBg;
+            _defaultColor = data.cardType == CardType.Number ? UIColor.CardNumBg : UIColor.CardOpBg;
             _image.color = _defaultColor;
         }
 

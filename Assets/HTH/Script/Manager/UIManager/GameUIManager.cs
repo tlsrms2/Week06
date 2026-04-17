@@ -139,12 +139,9 @@ namespace HTH
         public void SetGamePanelInfo(int stageIndex, long quota)
             => _hudManager.SetGamePanelInfo(stageIndex, quota);
 
-        public void UpdateCurrentValue(
-            List<CardDataSO> field,
-            long quota = 0,
-            bool flexibleAce = false,
-            long bustThreshold = 21)
-            => _hudManager.UpdateCurrentValue(field, quota, flexibleAce, bustThreshold);
+        public void UpdateCurrentValue(List<CardDataSO> field, long quota = 0, bool flexibleAce = false,
+            long bustThreshold = 21, bool currentValueSet = true)
+            => _hudManager.UpdateCurrentValue(field, quota, flexibleAce, bustThreshold, currentValueSet);
 
         public void SetResultInfo(long finalValue, long quota, bool win)
             => _resultPanelManager.SetCompareInfo(finalValue, quota, win);
@@ -157,8 +154,8 @@ namespace HTH
             _handUIManager.RefreshHand(hand);
         }
 
-        public void RefreshDealerArea(List<CardDataSO> field)
-            => _fieldUIManager.RefreshDealerField(field);
+        public void RefreshDealerArea(List<CardDataSO> field, bool hasHiddenCard = false)
+            => _fieldUIManager.RefreshDealerField(field, hasHiddenCard);
 
         public void PlaceOperatorOnSlot(int slotIndex, OperatorType op)
             => _fieldUIManager.PlaceOperatorOnSlot(slotIndex, op);
@@ -171,5 +168,9 @@ namespace HTH
 
         public void RemoveFromHand(int index)
             => _handUIManager.RemoveFromHand(index);
+
+        /// <summary>게임 패널 버튼을 비활성화합니다.</summary>
+        public void DisableGameButtons()
+            => _gamePanelManager.DisableButtons();
     }
 }

@@ -61,12 +61,7 @@ namespace HTH
         /// 프리팹 유무에 따라 카드 생성 방식을 결정합니다.
         /// 3D 프리팹 → UI 프리팹 → 코드 생성 순으로 우선순위를 가집니다.
         /// </summary>
-        private ICardView Create(
-            RectTransform parent,
-            CardDataSO data,
-            float width,
-            float height,
-            int fontSize)
+        private ICardView Create(RectTransform parent, CardDataSO data, float width, float height, int fontSize)
         {
             // 3D 프리팹 우선
             if (_card3DPrefab != null)
@@ -84,10 +79,7 @@ namespace HTH
         /// 프리팹을 Instantiate해서 ICardView를 반환합니다.
         /// 프리팹에 ICardView 구현체가 없으면 경고 후 null 반환합니다.
         /// </summary>
-        private ICardView CreateFromPrefab(
-            GameObject prefab,
-            RectTransform parent,
-            CardDataSO data)
+        private ICardView CreateFromPrefab(GameObject prefab, RectTransform parent, CardDataSO data)
         {
             var go = Instantiate(prefab, parent);
             var view = go.GetComponent<ICardView>();
@@ -109,19 +101,11 @@ namespace HTH
         /// 코드로 UI 카드 GameObject를 생성합니다.
         /// 프리팹이 없을 때의 임시 구현입니다.
         /// </summary>
-        private ICardView CreateFromCode(
-            RectTransform parent,
-            CardDataSO data,
-            float width,
-            float height,
-            int fontSize)
+        private ICardView CreateFromCode(RectTransform parent, CardDataSO data, float width, float height, int fontSize)
         {
             // ── 루트 GameObject ──
-            var go = new GameObject(
-                $"Card_{data.displayLabel}",
-                typeof(RectTransform),
-                typeof(Image),
-                typeof(Button));
+            var go = new GameObject($"Card_{data.displayLabel}", 
+                typeof(RectTransform), typeof(Image), typeof(Button));
             go.transform.SetParent(parent, false);
 
             // ── 크기 설정 ──
@@ -135,9 +119,7 @@ namespace HTH
             le.minHeight = height;
 
             // ── 텍스트 자식 먼저 생성 ──
-            var txtGo = new GameObject("Label",
-                typeof(RectTransform),
-                typeof(TextMeshProUGUI));
+            var txtGo = new GameObject("Label",typeof(RectTransform), typeof(TextMeshProUGUI));
             txtGo.transform.SetParent(go.transform, false);
 
             var txtRt = txtGo.GetComponent<RectTransform>();

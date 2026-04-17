@@ -56,7 +56,7 @@ namespace HTH
                 return false;
             }
             Debug.Log($"[StageManager] Stage {CurrentStage.stageIndex} 로드 — " +
-                      $"quota:{CurrentStage.quota:N0}");
+                      $"quota:{CurrentStage.bustValue:N0}");
             return true;
         }
         private bool LoadStage01()

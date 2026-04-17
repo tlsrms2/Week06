@@ -31,7 +31,18 @@ namespace HTH
         [Tooltip("카드 가운데 레이어 프리팹 — 앞면과 뒷면 사이에 배치되는 얇은 프리미티브")]
         public GameObject middlePrimitivePrefab;
 
+
+
         // ─── 유틸 프로퍼티 ───────────────────────────────────────
+
+        // CardDataSO.cs 에 추가
+        /// <summary>
+        /// 블랙잭 기준 카드 실제 값을 반환합니다.
+        /// J(11), Q(12), K(13)은 블랙잭 룰에 따라 10으로 처리합니다.
+        /// A(1)는 FlexibleAce 설정에 따라 ExpressionEvaluator에서 별도 처리합니다.
+        /// </summary>
+        public int BlackjackValue => numberValue > 10 ? 10 : numberValue;
+
         /// <summary>앞면 텍스처가 설정되어 있는지 확인합니다.</summary>
         public bool HasFrontTexture => frontTexture != null;
 

@@ -32,6 +32,16 @@ namespace HTH
         [Header("스테이지 규칙 플래그")]
         [Tooltip("true = 연산자 카드가 덱에 포함됨 (Stage 2+)")]
         public bool useOperatorCards = false;
+        [Header("판별식 설정")]
+        [Tooltip("true = 기본 판별식 (bustValue 초과 시 버스트)\n" +
+         "false = 리버스 판별식 (bustValue 미만 시 버스트)")]
+        public bool normalJudge = true;
+
+        [Tooltip("true = 음수 허용 false = 0 미만이면 0으로 고정")]
+        public bool allowNegative = false;
+
+        [Tooltip("true = Ace를 1 또는 11 중 유리한 값으로 자동 계산 (Stage 1 블랙잭 룰)")]
+        public bool useFlexibleAce = true;
 
         [Tooltip("연산자 카드 비율 (덱 전체 대비, 0.0~1.0) useOperatorCards = true일 때 사용")]
         [Range(0f, 0.3f)]
@@ -46,8 +56,5 @@ namespace HTH
 
         [Tooltip("이 스테이지 최대 배팅량")]
         public int visionBetMax = 50;
-
-        [Tooltip("true = Ace를 1 또는 11 중 유리한 값으로 자동 계산 (Stage 1 블랙잭 룰)")]
-        public bool useFlexibleAce = true;
     }
 }

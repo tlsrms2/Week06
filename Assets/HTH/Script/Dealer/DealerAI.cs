@@ -29,11 +29,22 @@
         {
             long bustValue = stage?.bustValue ?? _bustThreshold;
 
-            // 버스트 — 히트 불필요
-            if (currentTotal > bustValue) return false;
+            if (stage == null)
+                return currentTotal < (long)(bustValue * 0.8f);
 
-            // bustValue의 80% 미만이면 히트
-            return currentTotal < (long)(bustValue * 0.8f);
+            if (stage.normalJudge)
+            {
+                // 기본 — 버스트면 히트 불필요
+                if (currentTotal > bustValue) return false;
+                return currentTotal < (long)(bustValue * 0.8f);
+            }
+            else
+            {
+                // 리버스 — 버스트면 히트 불필요
+                if (currentTotal < bustValue) return false;
+                // bustValue의 120% 초과면 히트 (값을 낮춰야 하므로)
+                return currentTotal > (long)(bustValue * 1.2f);
+            }
         }
 
         public string GetResultDescription(

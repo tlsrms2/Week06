@@ -20,7 +20,7 @@ namespace HTH
         ///   = 2 + (1 − 3) + 9
         ///   = 2 + (-2) + 9 = 9
         /// </summary>
-        public static long Evaluate(List<CardDataSO> expression, bool useFlexibleAce = false, long bustThreshold = 21)
+        public static long Evaluate(List<CardDataSO> expression, bool useFlexibleAce = false, long bustThreshold = 21, bool allowNegative = false)
         {
             if (expression == null || expression.Count == 0) return 0;
 
@@ -29,6 +29,10 @@ namespace HTH
             long result = useFlexibleAce
                 ? EvaluateWithFlexibleAce(numbers, operators, bustThreshold)
                 : EvaluateInfix(numbers, operators);
+
+            // 음수 제한
+            if (!allowNegative && result < 0)
+                result = 0;
 
             return result;
         }

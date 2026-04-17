@@ -568,6 +568,16 @@ namespace HTH
         {
             if (_playerHandManager.Field.Count == 0) return;
 
+            // Stay 후 최종 버스트 체크
+            if (_blackjackManager.IsFinalBust(_playerHandManager.Field, _stageManager.CurrentStage))
+            {
+                UI_RefreshPlayerArea();
+                Debug.Log("[GM] Stay — 최종 버스트");
+                ExitPlayerTurn();
+                StartCoroutine(DelayedTransition(_bustDelay, GameState.Result));
+                return;
+            }
+
             // IsFinalBust 제거 — Stay 후 무조건 딜러 턴으로
             ExitPlayerTurn();
             StartCoroutine(DelayedTransition(_standDelay, GameState.DealerTurn));

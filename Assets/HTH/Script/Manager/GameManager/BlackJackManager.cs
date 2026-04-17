@@ -39,17 +39,13 @@ namespace HTH
         /// useFlexibleAce = true면 Ace를 1 또는 11로 자동 선택합니다.
         /// </summary>
         public long EvaluatePlayer(List<CardDataSO> field, StageDataSO stage)
-            => ExpressionEvaluator.Evaluate(
-                field,
-                stage.useFlexibleAce,
-                stage.bustValue);
+            => ExpressionEvaluator.Evaluate(field, stage.useFlexibleAce, 
+                stage.bustValue, stage.allowNegative);
 
         /// <summary>딜러 필드를 연산합니다.</summary>
         public long EvaluateDealer(List<CardDataSO> field, StageDataSO stage)
-            => ExpressionEvaluator.Evaluate(
-                field,
-                stage.useFlexibleAce,
-                stage.bustValue);
+            => ExpressionEvaluator.Evaluate(field, stage.useFlexibleAce,
+                stage.bustValue, stage.allowNegative);
 
         // ─── 버스트 감지 ──────────────────────────────────────────
 
@@ -64,6 +60,10 @@ namespace HTH
         /// </summary>
         public bool IsPlayerBust(List<CardDataSO> field, StageDataSO stage)
         {
+            // 연산자 스테이지 — 연산자 미배치 시 스킵
+            if (stage.useOperatorCards && !HasOperatorPlaced(field))
+                return false;
+
             long total = EvaluatePlayer(field, stage);
 
             // 연산자 스테이지이고 손패에 연산자가 있으면 스킵
@@ -72,7 +72,20 @@ namespace HTH
             if (stage.useOperatorCards && !HasOperatorPlaced(field))
                 return false;
 
-            return total > stage.bustValue;
+            return stage.normalJudge
+                ? total > stage.bustValue   // 기본 — 초과면 버스트
+                : total < stage.bustValue;  // 리버스 — 미만이면 버스트
+        }
+        /// <summary>
+        /// Stay 후 최종 버스트 여부를 확인합니다.
+        /// </summary>
+        public bool IsFinalBust(List<CardDataSO> field, StageDataSO stage)
+        {
+            long total = EvaluatePlayer(field, stage);
+
+            return stage.normalJudge
+                ? total > stage.bustValue   // 기본 — 초과면 버스트
+                : total < stage.bustValue;  // 리버스 — 미만이면 버스트
         }
 
         /// <summary>
@@ -98,62 +111,70 @@ namespace HTH
         ///
         /// bustValue가 21이면 기본 블랙잭과 동일하게 동작합니다.
         /// bustValue가 다른 값이면 그 값에 근접한 쪽이 승리합니다.
+        /// 
+        /// normalJudge = true  : bustValue 이하 최대값이 유리
+        /// normalJudge = false : bustValue 이상 최소값이 유리
         /// </summary>
-        public bool JudgeResult(
-            long playerTotal,
-            long dealerTotal,
-            StageDataSO stage)
+        public bool JudgeResult(long playerTotal, long dealerTotal, StageDataSO stage)
         {
-            // 플레이어 버스트
-            if (playerTotal > stage.bustValue)
+            if (stage.normalJudge)
             {
-                Debug.Log($"[BJ] 플레이어 버스트 — {playerTotal} > {stage.bustValue}");
-                return false;
-            }
+                // 기본 판별식
+                if (playerTotal > stage.bustValue) return false; // 플레이어 버스트
+                if (dealerTotal > stage.bustValue) return true;  // 딜러 버스트
 
-            // 딜러 버스트
-            if (dealerTotal > stage.bustValue)
+                // bustValue에 더 근접한 쪽 승리
+                long playerDiff = stage.bustValue - playerTotal;
+                long dealerDiff = stage.bustValue - dealerTotal;
+
+                if (playerDiff < dealerDiff) return true;
+                if (playerDiff > dealerDiff) return false;
+                return false; // 동점 → 패배
+            }
+            else
             {
-                Debug.Log($"[BJ] 딜러 버스트 — {dealerTotal} > {stage.bustValue}");
-                return true;
+                // 리버스 판별식
+                if (playerTotal < stage.bustValue) return false; // 플레이어 버스트
+                if (dealerTotal < stage.bustValue) return true;  // 딜러 버스트
+
+                // bustValue에 더 근접한 쪽 승리 (아래에서 접근)
+                long playerDiff = playerTotal - stage.bustValue;
+                long dealerDiff = dealerTotal - stage.bustValue;
+
+                if (playerDiff < dealerDiff) return true;
+                if (playerDiff > dealerDiff) return false;
+                return false; // 동점 → 패배
             }
-
-            // bustValue에 더 근접한 쪽 승리
-            long playerDiff = stage.bustValue - playerTotal;
-            long dealerDiff = stage.bustValue - dealerTotal;
-
-            Debug.Log($"[BJ] 근접 비교 — " +
-                      $"player:{playerTotal}(차이:{playerDiff}) " +
-                      $"dealer:{dealerTotal}(차이:{dealerDiff})");
-
-            if (playerDiff < dealerDiff) return true;
-            if (playerDiff > dealerDiff) return false;
-            return false; // 동점 → 무승부 (패배)
         }
 
         /// <summary>결과 설명 문자열을 생성합니다.</summary>
-        public string BuildResultDescription(
-            long playerTotal,
-            long dealerTotal,
-            StageDataSO stage,
-            bool win)
+        public string BuildResultDescription(long playerTotal, long dealerTotal, StageDataSO stage, bool win)
         {
-            long playerDiff = stage.bustValue - playerTotal;
-            long dealerDiff = stage.bustValue - dealerTotal;
+            if (stage.normalJudge)
+            {
+                if (playerTotal > stage.bustValue)
+                    return $"버스트! {playerTotal:N0} > {stage.bustValue:N0}";
+                if (dealerTotal > stage.bustValue)
+                    return $"딜러 버스트! 딜러: {dealerTotal:N0}";
+            }
+            else
+            {
+                if (playerTotal < stage.bustValue)
+                    return $"버스트! {playerTotal:N0} < {stage.bustValue:N0}";
+                if (dealerTotal < stage.bustValue)
+                    return $"딜러 버스트! 딜러: {dealerTotal:N0}";
+            }
 
-            // 플레이어 버스트
-            if (playerTotal > stage.bustValue)
-                return $"버스트! {playerTotal:N0} > {stage.bustValue:N0}";
+            long playerDiff = stage.normalJudge
+                ? stage.bustValue - playerTotal
+                : playerTotal - stage.bustValue;
+            long dealerDiff = stage.normalJudge
+                ? stage.bustValue - dealerTotal
+                : dealerTotal - stage.bustValue;
 
-            // 딜러 버스트
-            if (dealerTotal > stage.bustValue)
-                return $"딜러 버스트! 딜러: {dealerTotal:N0}";
-
-            // 동점
             if (playerDiff == dealerDiff)
                 return $"무승부. 둘 다 {stage.bustValue:N0}까지 {playerDiff:N0} 차이";
 
-            // 승패
             return win
                 ? $"승리! {playerTotal:N0} (차이:{playerDiff:N0}) " +
                   $"vs 딜러 {dealerTotal:N0} (차이:{dealerDiff:N0})"

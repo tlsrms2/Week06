@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 943659ca579a77945a001934a65be42e, type: 3}
+  m_Name: SpadeSuitData
+  m_EditorClassIdentifier: Assembly-CSharp::HTH.SuitDataSO
+  suit: {fileID: 11400000}
+  sharedMaterial: {fileID: 2100000, guid: acee5651fa8f28a4a93d6f83dc387a45, type: 2}
+  uvScale: {x: 1, y: 1}
+  cards:
+  - prefab: {fileID: 1800843900581309504, guid: 7828a58e070cef148a314decaf6110f3, type: 3}
+    uvOffset: {x: 0, y: 0}
+  - prefab: {fileID: 4704451784657835086, guid: 9390637788043ab4996f46329650af78, type: 3}
+    uvOffset: {x: 0, y: 0}
+  - prefab: {fileID: 851447088652125863, guid: 7100f2c9313a17e47914613589bc35b0, type: 3}
+    uvOffset: {x: 0, y: 0}
+  - prefab: {fileID: 3222222539241308848, guid: fe4dbedb61ea38148bd4b293dfcc200d, type: 3}
+    uvOffset: {x: 0, y: 0}
+  - prefab: {fileID: 486031839779561457, guid: 6e1fbba2f7fdcd545836f680a62c6f74, type: 3}
+    uvOffset: {x: 0, y: 0}
+  - prefab: {fileID: 2424780035722609411, guid: 832e03703678cf84798ef97b38402a7b, type: 3}
+    uvOffset: {x: 0, y: 0}
+  - prefab: {fileID: 8345925600134585776, guid: 43a65f7850aaa2a4a810e6e412524732, type: 3}
+    uvOffset: {x: 0, y: 0}
+  - prefab: {fileID: 9118515906719512506, guid: 02415118701fa9d45a5e3e43749049c2, type: 3}
+    uvOffset: {x: 0, y: 0}
+  - prefab: {fileID: 9221402876072953124, guid: 46148caa0154b4444963091ad3889f86, type: 3}
+    uvOffset: {x: 0, y: 0}
+  - prefab: {fileID: 4251624996254033595, guid: 3faae46d5f2c1804b8511d577106abb7, type: 3}
+    uvOffset: {x: 0, y: 0}
+  - prefab: {fileID: 8922008535558860947, guid: 9f9e79fcd843c244185d32ee9f7aac23, type: 3}
+    uvOffset: {x: 0, y: 0}
+  - prefab: {fileID: 6824222627732136798, guid: 0ffa42bb9ab2a7f49beec6ea3f044d6e, type: 3}
+    uvOffset: {x: 0, y: 0}
+  - prefab: {fileID: 6093760270803575120, guid: b5170d2275f45684ea03edd9f3dcf573, type: 3}
+    uvOffset: {x: 0, y: 0}

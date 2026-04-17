@@ -59,34 +59,27 @@ namespace HTH
         // ─── 배팅 ────────────────────────────────────────────────
 
         /// <summary>
-        /// 배팅 패널을 초기화합니다.
-        /// Confirm 시 FieldManager를 활성화한 뒤 onConfirm을 호출합니다.
-        /// GameUIManager가 VisionBettingManager와 FieldManager를 중재합니다.
+        /// 배팅 패널을 초기화하고 엽니다.
+        /// Confirm 시 FieldManager 활성화 후 onConfirm 호출합니다.
         /// </summary>
         public void SetupBetting(int betMin, int betMax, Action<int> onConfirm)
         {
-            //FieldPanel 초기화 및 숨김
-            _fieldManager.ClearPlayerField();
-            _fieldManager.ClearDealerField();
-            _fieldManager.ClearPlayerHand();
+            // 필드 초기화 및 숨김
+            _fieldManager.ClearAll();
             _fieldManager.Hide();
 
-            //HUD 초기화
+            // HUD 초기화
             _hudManager.ClearDealerValue();
 
-            _visionBettingManager.Setup(betMin, betMax, (betAmount) =>
+            _visionBettingManager.Setup(betMin, betMax, betAmount =>
             {
                 _fieldManager.Show();
                 onConfirm?.Invoke(betAmount);
             });
 
-            //베팅 패널 강제 오픈
+            // 배팅 패널 강제 오픈
             _visionBettingManager.OpenPanel();
         }
-
-        /// <summary>필드 패널을 숨깁니다.</summary>
-        public void HideFieldPanel()
-            => _fieldManager.Hide();
 
         // ─── 게임 버튼 ────────────────────────────────────────────
 
@@ -126,22 +119,25 @@ namespace HTH
         public void ShowStageClear(Action onRestart)
             => _gamePanelManager.ShowStageClear(onRestart);
 
-        // ─── 필드 ────────────────────────────────────────────────
+        // ─── 필드 — Add 방식 ─────────────────────────────────────
 
-        /// <summary>플레이어 필드와 손패 UI를 갱신합니다.</summary>
-        public void RefreshPlayerArea(
-            List<CardDataSO> field,
-            List<CardDataSO> hand)
-        {
-            _fieldManager.RefreshPlayerField(field);
-            _fieldManager.RefreshPlayerHand(hand);
-        }
+        /// <summary>플레이어 필드에 카드 1장을 추가합니다.</summary>
+        public void AddPlayerFieldCard(DeckSO.CardEntry entry)
+            => _fieldManager.AddPlayerFieldCard(entry);
 
-        /// <summary>딜러 필드 UI를 갱신합니다.</summary>
-        public void RefreshDealerArea(
-            List<CardDataSO> field,
-            bool hasHiddenCard = false)
-            => _fieldManager.RefreshDealerField(field, hasHiddenCard);
+        /// <summary>딜러 필드에 카드 1장을 추가합니다.</summary>
+        public void AddDealerFieldCard(DeckSO.CardEntry entry, bool isHidden = false)
+            => _fieldManager.AddDealerFieldCard(entry, isHidden);
+
+        /// <summary>손패에 카드 1장을 추가합니다.</summary>
+        public void AddHandCard(DeckSO.CardEntry entry)
+            => _fieldManager.AddHandCard(entry);
+
+        /// <summary>전체 필드를 초기화합니다. 라운드 시작 시 호출합니다.</summary>
+        public void ClearAllFields()
+            => _fieldManager.ClearAll();
+
+        // ─── 슬롯 / 하이라이트 ───────────────────────────────────
 
         /// <summary>연산자 슬롯에 연산자를 배치합니다.</summary>
         public void PlaceOperatorOnSlot(int slotIndex, OperatorType op)
@@ -154,5 +150,9 @@ namespace HTH
         /// <summary>손패 카드 선택 상태를 갱신합니다.</summary>
         public void HighlightHandCard(int index)
             => _fieldManager.HighlightHandCard(index);
+
+        /// <summary>딜러 비공개 카드를 앞면으로 뒤집습니다.</summary>
+        public void RevealDealerHiddenCard()
+            => _fieldManager.RevealDealerHiddenCard();
     }
 }

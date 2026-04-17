@@ -6,33 +6,37 @@ namespace HTH
 {
     /// <summary>
     /// 딜러 턴 진행과 딜러 필드를 담당합니다.
-    /// Stage 2+에서는 연산자 카드를 손패에 보관하고
-    /// DealerAI가 최적 연산자를 자동 배치합니다.
+    /// DeckSO.CardEntry(data + suit + suitData)로 카드 한 장을 관리합니다.
+    /// Stage 2+에서는 연산자 카드를 손패에 보관하고 AI가 자동 배치합니다.
     /// </summary>
     public class DealerManager : MonoBehaviour
     {
         // ─── 상태 ─────────────────────────────────────────────────
-        /// <summary>공개된 딜러 필드 카드 목록 (숫자 + 배치된 연산자)</summary>
-        public List<CardDataSO> Field { get; private set; } = new();
+        public List<DeckSO.CardEntry> Field { get; private set; } = new();
+        public List<DeckSO.CardEntry> Hand { get; private set; } = new();
 
-        /// <summary>딜러 손패 — 아직 배치되지 않은 연산자 카드</summary>
-        public List<CardDataSO> Hand { get; private set; } = new();
-
-        /// <summary>비공개 카드 보유 여부</summary>
         public bool HasHiddenCard => _hiddenCard != null;
+        private DeckSO.CardEntry _hiddenCard;
 
-        private CardDataSO _hiddenCard;
+        // ─── 변환 헬퍼 ───────────────────────────────────────────
+        public List<CardDataSO> FieldData => Field.ConvertAll(e => e.data);
 
         // ─── 이벤트 ──────────────────────────────────────────────
-        /// <summary>딜러 필드/손패가 변경될 때마다 발행</summary>
-        public event System.Action OnDealerFieldChanged;
+        /// <summary>
+        /// 딜러 필드에 카드가 추가될 때 발행.
+        /// entry : 추가된 카드
+        /// isHidden : 비공개 카드 여부
+        /// GameManager.OnDealerCardAdded가 구독해 UI에 카드 1장만 추가합니다.
+        /// </summary>
+        public event System.Action<DeckSO.CardEntry, bool> OnDealerCardAdded;
+
+        public event System.Action OnDealerCardRevealed;
 
         /// <summary>딜러 턴이 완전히 종료되면 발행</summary>
         public event System.Action OnDealerTurnEnded;
 
         // ─── 초기화 ───────────────────────────────────────────────
 
-        /// <summary>라운드 시작 시 딜러 필드/손패/비공개 카드를 초기화합니다.</summary>
         public void ResetField()
         {
             Field.Clear();
@@ -42,170 +46,118 @@ namespace HTH
 
         // ─── 초기 딜링 ────────────────────────────────────────────
 
-        /// <summary>
-        /// 딜러 공개 카드를 추가합니다.
-        /// 초기 딜링 시 첫 번째 카드에 사용합니다.
-        /// </summary>
-        public void AddOpenCard(CardDataSO card)
+        /// <summary>딜러 공개 카드를 추가합니다.</summary>
+        public void AddOpenCard(DeckSO.CardEntry entry)
         {
-            Field.Add(card);
-            OnDealerFieldChanged?.Invoke();
+            Field.Add(entry);
+            OnDealerCardAdded?.Invoke(entry, false); // isHidden = false
         }
 
-        /// <summary>
-        /// 딜러 비공개 카드를 설정합니다.
-        /// 초기 딜링 시 두 번째 카드에 사용합니다.
-        /// UI에는 뒷면으로 표시됩니다.
-        /// </summary>
-        public void SetHiddenCard(CardDataSO card)
+        /// <summary>딜러 비공개 카드를 설정합니다. UI에는 뒷면으로 표시됩니다.</summary>
+        public void SetHiddenCard(DeckSO.CardEntry entry)
         {
-            _hiddenCard = card;
-            OnDealerFieldChanged?.Invoke();
+            _hiddenCard = entry;
+            OnDealerCardAdded?.Invoke(entry, true); // isHidden = true
         }
 
-        /// <summary>
-        /// 비공개 카드를 공개합니다.
-        /// 플레이어 Stay 후 딜러 턴 시작 시 호출합니다.
-        /// </summary>
+        /// <summary>비공개 카드를 공개합니다. 딜러 턴 시작 시 호출합니다.</summary>
         public void RevealHiddenCard()
         {
             if (_hiddenCard == null) return;
             Field.Add(_hiddenCard);
+            OnDealerCardAdded?.Invoke(_hiddenCard, false); // 공개 → isHidden = false
             _hiddenCard = null;
-            OnDealerFieldChanged?.Invoke();
         }
 
         // ─── 딜러 턴 ─────────────────────────────────────────────
 
-        /// <summary>
-        /// 딜러 턴을 실행합니다.
-        /// 비공개 카드를 먼저 공개한 뒤 ShouldHit 조건을 만족하는 동안 드로우합니다.
-        /// Stage 2+에서는 드로우한 연산자 카드를 AI가 자동 배치합니다.
-        /// </summary>
-        public IEnumerator RunTurn(DeckRunner deckRunner, IDealerStrategy dealerStrategy, StageDataSO stage)
+        public IEnumerator RunTurn(
+            DeckRunner deckRunner,
+            IDealerStrategy dealerStrategy,
+            StageDataSO stage)
         {
-            // 비공개 카드 공개
             RevealHiddenCard();
             yield return new WaitForSeconds(0.5f);
 
             while (true)
             {
-                // 연산자 자동 배치 시도
                 if (stage.useOperatorCards && Hand.Count > 0)
-                    TryAutoPlaceOperator(dealerStrategy, stage);
+                    TryAutoPlaceOperator(stage);
 
                 long total = ExpressionEvaluator.Evaluate(
-                    Field, stage.useFlexibleAce, stage.bustValue);
+                    FieldData, stage.useFlexibleAce, stage.bustValue);
 
                 Debug.Log($"[Dealer] total:{total} bustValue:{stage.bustValue}");
 
-                // 딜러 버스트 — 즉시 중단
                 if (total > stage.bustValue)
                 {
                     Debug.Log("[Dealer] 버스트 — 턴 종료");
                     break;
                 }
 
-                // ShouldHit 조건 미충족 — 히트 중단
                 if (!dealerStrategy.ShouldHit(total, stage))
                 {
                     Debug.Log("[Dealer] ShouldHit false — 턴 종료");
                     break;
                 }
 
-                // 덱 소진
-                if (!deckRunner.TryDraw(out CardDataSO card))
+                if (!deckRunner.TryDraw(out DeckSO.CardEntry entry))
                 {
                     Debug.Log("[Dealer] 덱 소진 — 턴 종료");
                     break;
                 }
 
-                if (card.cardType == CardType.Number)
+                if (entry.data.cardType == CardType.Number)
                 {
-                    Field.Add(card);
-                    OnDealerFieldChanged?.Invoke();
+                    Field.Add(entry);
+                    OnDealerCardAdded?.Invoke(entry, false);
                     yield return new WaitForSeconds(0.8f);
                 }
                 else if (stage.useOperatorCards)
                 {
-                    Hand.Add(card);
-                    OnDealerFieldChanged?.Invoke();
+                    Hand.Add(entry);
                     yield return new WaitForSeconds(0.3f);
                 }
             }
 
-            // 턴 종료 전 남은 연산자 최종 배치
             if (stage.useOperatorCards && Hand.Count > 0)
-                TryAutoPlaceOperator(dealerStrategy, stage);
+                TryAutoPlaceOperator(stage);
 
             OnDealerTurnEnded?.Invoke();
         }
 
-        /// <summary>
-        /// bustValue에 가장 근접한 결과를 내는 연산자를 선택합니다.
-        /// 버스트(초과)하는 결과는 최저점으로 처리합니다.
-        /// </summary>
-        private long ScoreResult(long result, StageDataSO stage)
-        {
-            // 버스트 → 최저점
-            if (result > stage.bustValue) return long.MinValue;
-
-            // bustValue에 근접할수록 높은 점수
-            // 차이가 작을수록 좋으므로 음수로 변환
-            return -(stage.bustValue - result);
-        }
-
         // ─── AI 연산자 자동 배치 ──────────────────────────────────
 
-        /// <summary>
-        /// 손패의 연산자 카드 중 목표값에 가장 유리한 것을 자동 배치합니다.
-        /// 숫자 카드가 2장 이상일 때만 동작합니다.
-        /// 배치 위치는 마지막 숫자 카드 앞 슬롯입니다.
-        /// </summary>
-        private void TryAutoPlaceOperator(IDealerStrategy dealerStrategy, StageDataSO stage)
+        private void TryAutoPlaceOperator(StageDataSO stage)
         {
-            // 숫자 카드 2장 이상이어야 슬롯 존재
-            var numberCards = GetNumberCards();
-            if (numberCards.Count < 2 || Hand.Count == 0) return;
+            var numberEntries = GetNumberEntries();
+            if (numberEntries.Count < 2 || Hand.Count == 0) return;
 
-            // 마지막 슬롯 인덱스
-            int slotIndex = numberCards.Count - 2;
-
-            // 이미 해당 슬롯에 연산자가 배치되어 있으면 스킵
+            int slotIndex = numberEntries.Count - 2;
             if (IsSlotOccupied(slotIndex)) return;
 
-            // 가장 유리한 연산자 선택
-            CardDataSO bestOp = SelectBestOperator(numberCards, stage);
+            DeckSO.CardEntry bestOp = SelectBestOperator(numberEntries, stage);
             if (bestOp == null) return;
 
-            // 손패에서 제거 후 필드에 삽입
             Hand.Remove(bestOp);
             InsertOperatorAt(slotIndex, bestOp);
-            OnDealerFieldChanged?.Invoke();
 
             Debug.Log($"[DealerManager] 연산자 자동 배치 — " +
-                      $"slot:{slotIndex} op:{bestOp.displayLabel}");
+                      $"slot:{slotIndex} op:{bestOp.data.displayLabel}");
         }
 
-        /// <summary>
-        /// 손패의 연산자 중 목표값에 가장 근접한 결과를 내는 것을 선택합니다.
-        /// currentValueSet = true  : bustValue 이하 최대값을 목표
-        /// currentValueSet = false : bustValue 이상 최소값을 목표
-        /// </summary>
-        private CardDataSO SelectBestOperator(
-            List<CardDataSO> numberCards,
+        private DeckSO.CardEntry SelectBestOperator(
+            List<DeckSO.CardEntry> numberEntries,
             StageDataSO stage)
         {
-            CardDataSO bestOp = null;
+            DeckSO.CardEntry bestOp = null;
             long bestScore = long.MinValue;
 
             foreach (var op in Hand)
             {
-                // 마지막 슬롯에 이 연산자를 배치했을 때의 결과 시뮬레이션
-                var simField = BuildSimulatedField(numberCards, op, numberCards.Count - 2);
+                var simField = BuildSimulatedField(numberEntries, op, numberEntries.Count - 2);
                 long result = ExpressionEvaluator.Evaluate(
                     simField, stage.useFlexibleAce, stage.bustValue);
-
                 long score = ScoreResult(result, stage);
 
                 if (score > bestScore)
@@ -218,41 +170,41 @@ namespace HTH
             return bestOp;
         }
 
-        /// <summary>
-        /// 특정 슬롯에 연산자를 배치했을 때의 필드를 시뮬레이션합니다.
-        /// </summary>
+        private long ScoreResult(long result, StageDataSO stage)
+        {
+            if (result > stage.bustValue) return long.MinValue;
+            return -(stage.bustValue - result);
+        }
+
         private List<CardDataSO> BuildSimulatedField(
-            List<CardDataSO> numberCards,
-            CardDataSO op,
+            List<DeckSO.CardEntry> numberEntries,
+            DeckSO.CardEntry op,
             int slotIndex)
         {
             var sim = new List<CardDataSO>();
-            for (int i = 0; i < numberCards.Count; i++)
+            for (int i = 0; i < numberEntries.Count; i++)
             {
-                if (i == slotIndex + 1) sim.Add(op); // 슬롯 위치에 연산자 삽입
-                sim.Add(numberCards[i]);
+                if (i == slotIndex + 1) sim.Add(op.data);
+                sim.Add(numberEntries[i].data);
             }
             return sim;
         }
 
-        /// <summary>Field에서 숫자 카드만 추출합니다.</summary>
-        private List<CardDataSO> GetNumberCards()
+        private List<DeckSO.CardEntry> GetNumberEntries()
         {
-            var result = new List<CardDataSO>();
-            foreach (var card in Field)
-                if (card.cardType == CardType.Number)
-                    result.Add(card);
+            var result = new List<DeckSO.CardEntry>();
+            foreach (var entry in Field)
+                if (entry.data.cardType == CardType.Number)
+                    result.Add(entry);
             return result;
         }
 
-        /// <summary>해당 슬롯에 이미 연산자가 배치되어 있는지 확인합니다.</summary>
         private bool IsSlotOccupied(int slotIndex)
         {
-            // Field에서 슬롯 인덱스 번째 연산자 존재 여부 확인
             int opCount = 0;
-            foreach (var card in Field)
+            foreach (var entry in Field)
             {
-                if (card.cardType == CardType.Operator)
+                if (entry.data.cardType == CardType.Operator)
                 {
                     if (opCount == slotIndex) return true;
                     opCount++;
@@ -261,19 +213,14 @@ namespace HTH
             return false;
         }
 
-        /// <summary>
-        /// Field의 특정 슬롯 위치에 연산자 카드를 삽입합니다.
-        /// 숫자 카드 기준 slotIndex번째 숫자와 그 다음 숫자 사이에 삽입합니다.
-        /// </summary>
-        private void InsertOperatorAt(int slotIndex, CardDataSO op)
+        private void InsertOperatorAt(int slotIndex, DeckSO.CardEntry op)
         {
-            // slotIndex번째 숫자 카드 다음 위치 탐색
             int numSeen = -1;
             int insertPos = Field.Count;
 
             for (int i = 0; i < Field.Count; i++)
             {
-                if (Field[i].cardType == CardType.Number)
+                if (Field[i].data.cardType == CardType.Number)
                 {
                     numSeen++;
                     if (numSeen == slotIndex)

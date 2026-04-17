@@ -53,20 +53,11 @@ namespace HTH
             long dealerTotal,
             StageDataSO stage)
         {
-            if (stage.stageIndex == 1)
-            {
-                if (playerTotal > 21) return false;
-                if (dealerTotal > 21) return true;
-                return playerTotal >= dealerTotal;
-            }
-            else
-            {
-                bool playerBust = playerTotal > stage.quota;
-                bool dealerBust = dealerTotal > _dealerStrategy.BustThreshold;
-                if (playerBust) return false;
-                if (dealerBust) return true;
-                return playerTotal >= dealerTotal;
-            }
+            bool playerBust = playerTotal > stage.quota;
+            bool dealerBust = dealerTotal > _dealerStrategy.BustThreshold;
+            if (playerBust) return false;
+            if (dealerBust) return true;
+            return playerTotal >= dealerTotal;
         }
 
         /// <summary>결과 설명 문자열을 생성합니다.</summary>

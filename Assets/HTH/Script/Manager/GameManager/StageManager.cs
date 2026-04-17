@@ -44,7 +44,7 @@ namespace HTH
         }
 
         /// <summary>현재 스테이지를 다시 로드합니다. (재도전)</summary>
-        public bool ReloadCurrent() => LoadCurrent();
+        public bool ReloadCurrent() => LoadStage01();
 
         /// <summary>현재 인덱스의 StageDataSO를 로드합니다.</summary>
         private bool LoadCurrent()
@@ -57,6 +57,11 @@ namespace HTH
             }
             Debug.Log($"[StageManager] Stage {CurrentStage.stageIndex} 로드 — " +
                       $"quota:{CurrentStage.quota:N0}");
+            return true;
+        }
+        private bool LoadStage01()
+        {
+            CurrentStage = _stageRegistry.GetStage(0);
             return true;
         }
     }

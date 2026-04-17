@@ -7,38 +7,51 @@ using UnityEngine.UI;
 namespace HTH
 {
     /// <summary>
-    /// 플레이어 필드와 딜러 필드의 카드 UI를 담당합니다.
-    /// 연산자 슬롯 생성/갱신/하이라이트도 이 클래스가 처리합니다.
+    /// 플레이어 필드 / 딜러 필드 / 플레이어 손패를 통합 관리합니다.
+    /// 연산자 슬롯 클릭 이벤트를 직접 담당합니다.
+    /// 카드 공개/비공개 상태를 관리합니다.
     /// </summary>
-    public class FieldUIManager : MonoBehaviour
+    public class FieldManager : MonoBehaviour
     {
         // ─── Inspector ───────────────────────────────────────────
-        [Tooltip("플레이어 카드 컨테이너")]
+        [Header("패널")]
+        [Tooltip("플레이어 턴 패널 루트 — 필드/손패/버튼이 포함된 패널")]
+        [SerializeField] private GameObject _fieldPanelRoot;
+
+        [Header("플레이어 영역")]
+        [Tooltip("플레이어 필드 컨테이너")]
         [SerializeField] private RectTransform _playerFieldContainer;
 
-        [Tooltip("딜러 카드 컨테이너")]
+        [Tooltip("플레이어 손패 컨테이너")]
+        [SerializeField] private RectTransform _playerHandContainer;
+
+        [Header("딜러 영역")]
+        [Tooltip("딜러 필드 컨테이너")]
         [SerializeField] private RectTransform _dealerFieldContainer;
 
         // ─── 의존성 ───────────────────────────────────────────────
         private CardCreateManager _cardCreate;
 
         // ─── 카드 뷰 추적 ────────────────────────────────────────
-        private readonly List<ICardView> _fieldCards = new();
-        private readonly List<ICardView> _dealerCards = new();
+        private readonly List<ICardView> _playerFieldCards = new();
+        private readonly List<ICardView> _dealerFieldCards = new();
+        private readonly List<ICardView> _playerHandCards = new();
         private readonly List<GameObject> _operatorSlots = new();
         private readonly List<Image> _operatorSlotImages = new();
         private readonly List<TextMeshProUGUI> _operatorSlotTexts = new();
+
+        private GameObject _dealerHiddenSlot;
 
         // ─── 이벤트 ──────────────────────────────────────────────
         /// <summary>연산자 슬롯 클릭 시 발행 (슬롯 인덱스)</summary>
         public event Action<int> OnOperatorSlotClicked;
 
-        // ─── 내부 ────────────────────────────────────────────────
-        private GameObject _dealerHiddenSlot;
-        
+        /// <summary>손패 카드 클릭 시 발행 (손패 인덱스)</summary>
+        public event Action<int> OnHandCardClicked;
+
         // ─── 초기화 ───────────────────────────────────────────────
 
-        /// <summary>CardViewFactory를 주입합니다. GameUIManager가 Awake에서 호출합니다.</summary>
+        /// <summary>CardCreateManager를 주입합니다.</summary>
         public void Initialize(CardCreateManager cardCreate)
         {
             _cardCreate = cardCreate;
@@ -47,28 +60,37 @@ namespace HTH
         // ─── 플레이어 필드 ────────────────────────────────────────
 
         /// <summary>
-        /// 플레이어 필드 UI를 갱신합니다.
-        /// GameUIManager.RefreshPlayerArea에서 호출합니다.
+        /// 필드 패널을 활성화합니다.
+        /// VisionBettingManager의 Confirm 버튼 확정 후 호출됩니다.
         /// </summary>
-        public void RefreshField(List<CardDataSO> field)
+        public void Show() => _fieldPanelRoot?.SetActive(true);
+
+        /// <summary>필드 패널을 비활성화합니다.</summary>
+        public void Hide() => _fieldPanelRoot?.SetActive(false);
+
+        /// <summary>
+        /// 플레이어 필드 UI를 갱신합니다.
+        /// 1단계 숫자 카드로 슬롯과 카드 UI를 생성합니다.
+        /// 2단계 연산자 카드를 숫자 카드 기준 슬롯에 배치합니다.
+        /// </summary>
+        public void RefreshPlayerField(List<CardDataSO> field)
         {
-            ClearField();
-            // 1단계 — 숫자 카드만 처리(슬롯 + 카드 UI 생성)
+            ClearPlayerField();
+
+            // 1단계 — 숫자 카드
             foreach (var card in field)
             {
                 if (card.cardType != CardType.Number) continue;
 
-                if (_fieldCards.Count > 0)
-                    CreateOperatorSlot(_fieldCards.Count - 1);
+                if (_playerFieldCards.Count > 0)
+                    CreateOperatorSlot(_playerFieldCards.Count - 1);
 
                 var view = _cardCreate.CreateFieldCard(_playerFieldContainer, card);
                 view.SetInteractable(false);
-                _fieldCards.Add(view);
+                _playerFieldCards.Add(view);
             }
 
-            // 2단계 — 연산자 카드를 숫자 카드 기준 위치로 슬롯에 배치
-            // 숫자 카드를 만날 때마다 카운트를 올리고
-            // 연산자 카드는 직전까지 센 숫자 카드 수 - 1 이 슬롯 인덱스
+            // 2단계 — 연산자 카드
             int numCount = 0;
             foreach (var card in field)
             {
@@ -78,7 +100,6 @@ namespace HTH
                 }
                 else if (card.cardType == CardType.Operator)
                 {
-                    // numCount번째 숫자 카드 뒤 슬롯 = numCount - 1
                     int slotIndex = numCount - 1;
                     if (slotIndex >= 0 && slotIndex < _operatorSlotTexts.Count)
                         PlaceOperatorOnSlot(slotIndex, card.operatorType);
@@ -86,13 +107,13 @@ namespace HTH
             }
         }
 
-        /// <summary>플레이어 필드와 슬롯 UI를 모두 제거합니다.</summary>
-        public void ClearField()
+        /// <summary>플레이어 필드와 슬롯을 모두 제거합니다.</summary>
+        public void ClearPlayerField()
         {
-            foreach (var v in _fieldCards)
+            foreach (var v in _playerFieldCards)
                 if (v is MonoBehaviour mb && mb != null)
                     Destroy(mb.gameObject);
-            _fieldCards.Clear();
+            _playerFieldCards.Clear();
 
             foreach (var go in _operatorSlots)
                 if (go != null) Destroy(go);
@@ -101,31 +122,7 @@ namespace HTH
             _operatorSlotTexts.Clear();
         }
 
-        /// <summary>
-        /// 필드에 카드 UI를 추가합니다.
-        /// 두 번째 카드부터 앞에 연산자 슬롯을 자동 생성합니다.
-        /// </summary>
-        private void AddCardToField(CardDataSO card, int index)
-        {
-            if (card.cardType == CardType.Operator)
-            {
-                // 연산자 카드는 슬롯 UI를 갱신만 함 — 카드 UI 생성 안 함
-                // slotIndex = 숫자 카드 기준 앞 슬롯
-                int slotIndex = _fieldCards.Count; // 현재까지 추가된 숫자 카드 수
-                if (slotIndex > 0 && slotIndex - 1 < _operatorSlotTexts.Count)
-                    PlaceOperatorOnSlot(slotIndex - 1, card.operatorType);
-                return;
-            }
-
-            // 숫자 카드 — 두 번째부터 슬롯 먼저 생성
-            if (_fieldCards.Count > 0) CreateOperatorSlot(_fieldCards.Count - 1);
-
-            var view = _cardCreate.CreateFieldCard(_playerFieldContainer, card);
-            view.SetInteractable(false);
-            _fieldCards.Add(view);
-        }
-
-        /// <summary>연산자 슬롯 GameObject를 생성합니다.</summary>
+        /// <summary>연산자 슬롯을 생성합니다.</summary>
         private void CreateOperatorSlot(int slotIndex)
         {
             var slotGo = new GameObject(
@@ -141,7 +138,6 @@ namespace HTH
             var slotImg = slotGo.GetComponent<Image>();
             slotImg.color = UIColor.SlotDefault;
 
-            // 슬롯 텍스트
             var slotTxtGo = new GameObject("Label",
                 typeof(RectTransform), typeof(TextMeshProUGUI));
             slotTxtGo.transform.SetParent(slotGo.transform, false);
@@ -165,9 +161,8 @@ namespace HTH
             le.minWidth = 45;
             le.minHeight = 65;
 
-            var slotBtn = slotGo.GetComponent<Button>();
             int captured = slotIndex;
-            slotBtn.onClick.AddListener(
+            slotGo.GetComponent<Button>().onClick.AddListener(
                 () => OnOperatorSlotClicked?.Invoke(captured));
 
             _operatorSlots.Add(slotGo);
@@ -175,29 +170,23 @@ namespace HTH
             _operatorSlotTexts.Add(slotTxt);
         }
 
-        /// <summary>
-        /// 연산자 슬롯에 연산자를 배치하고 색상과 텍스트를 갱신합니다.
-        /// </summary>
+        /// <summary>연산자 슬롯에 연산자를 배치합니다.</summary>
         public void PlaceOperatorOnSlot(int slotIndex, OperatorType op)
         {
             if (slotIndex < 0 || slotIndex >= _operatorSlotTexts.Count) return;
 
-            string symbol = op switch
+            _operatorSlotTexts[slotIndex].text = op switch
             {
                 OperatorType.Subtract => "−",
                 OperatorType.Multiply => "×",
                 OperatorType.Divide => "÷",
                 _ => "+"
             };
-
-            _operatorSlotTexts[slotIndex].text = symbol;
             _operatorSlotTexts[slotIndex].color = UIColor.CardText;
             _operatorSlotImages[slotIndex].color = UIColor.CardOpBg;
         }
 
-        /// <summary>
-        /// 배치 가능한 슬롯을 하이라이트합니다.
-        /// </summary>
+        /// <summary>배치 가능한 슬롯을 하이라이트합니다.</summary>
         public void HighlightAvailableSlots(bool highlight)
         {
             foreach (var img in _operatorSlotImages)
@@ -208,30 +197,39 @@ namespace HTH
 
         /// <summary>
         /// 딜러 필드 UI를 갱신합니다.
-        /// GameUIManager.RefreshDealerArea에서 호출합니다.
+        /// hasHiddenCard = true면 뒷면 카드 슬롯을 추가합니다.
         /// </summary>
-        public void RefreshDealerField(List<CardDataSO> field, bool hasHiddenCard)
+        public void RefreshDealerField(List<CardDataSO> field, bool hasHiddenCard = false)
         {
             ClearDealerField();
-            for (int i = 0; i < field.Count; i++)
-                AddCardToDealerField(field[i]);
 
-            if (hasHiddenCard) AddHiddenCardSlot();
+            foreach (var card in field)
+                AddDealerCard(card, isOpen: true);
+
+            if (hasHiddenCard)
+                AddDealerHiddenSlot();
         }
-        /// <summary>
-        /// 뒷면 카드 슬롯을 생성합니다.
-        /// 딜러의 비공개 카드 자리를 표시합니다.
-        /// </summary>
-        private void AddHiddenCardSlot()
+
+        /// <summary>딜러 필드 카드를 추가합니다.</summary>
+        private void AddDealerCard(CardDataSO card, bool isOpen)
         {
-            var go = new GameObject("HiddenCard", typeof(RectTransform), typeof(Image));
+            var view = _cardCreate.CreateFieldCard(_dealerFieldContainer, card);
+            view.SetInteractable(false);
+            _dealerFieldCards.Add(view);
+        }
+
+        /// <summary>딜러 비공개 카드 슬롯을 생성합니다.</summary>
+        private void AddDealerHiddenSlot()
+        {
+            var go = new GameObject("HiddenCard",
+                typeof(RectTransform), typeof(Image));
             go.transform.SetParent(_dealerFieldContainer, false);
 
             var rt = go.GetComponent<RectTransform>();
             rt.sizeDelta = new Vector2(65, 90);
 
             var img = go.GetComponent<Image>();
-            img.color = UIColor.Hex("#2A4A3A"); // 뒷면 색상
+            img.color = UIColor.Hex("#2A4A3A");
 
             var le = go.AddComponent<LayoutElement>();
             le.preferredWidth = 65;
@@ -239,8 +237,8 @@ namespace HTH
             le.minWidth = 65;
             le.minHeight = 90;
 
-            // 뒷면 텍스트
-            var txtGo = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+            var txtGo = new GameObject("Label",
+                typeof(RectTransform), typeof(TextMeshProUGUI));
             txtGo.transform.SetParent(go.transform, false);
 
             var txtRt = txtGo.GetComponent<RectTransform>();
@@ -256,47 +254,85 @@ namespace HTH
             txt.color = UIColor.SlotText;
             txt.fontStyle = FontStyles.Bold;
 
-            _dealerCards.Add(null); // 슬롯 자리만 확보 (ICardView 없음)
-            _dealerHiddenSlot = go; // 별도 추적
+            _dealerHiddenSlot = go;
         }
 
-        /// <summary>딜러 필드의 모든 카드 UI를 제거합니다.</summary>
+        /// <summary>딜러 필드를 초기화합니다.</summary>
         public void ClearDealerField()
         {
-            foreach (var v in _dealerCards)
+            foreach (var v in _dealerFieldCards)
                 if (v is MonoBehaviour mb && mb != null)
                     Destroy(mb.gameObject);
-            _dealerCards.Clear();
+            _dealerFieldCards.Clear();
 
-            if(_dealerHiddenSlot != null)
+            if (_dealerHiddenSlot != null)
             {
                 Destroy(_dealerHiddenSlot);
-                _dealerHiddenSlot.SetActive(false);
+                _dealerHiddenSlot = null;
             }
         }
 
-        /// <summary>딜러 필드에 카드 UI를 추가합니다.</summary>
-        private void AddCardToDealerField(CardDataSO card)
+        // ─── 플레이어 손패 ────────────────────────────────────────
+
+        /// <summary>플레이어 손패 UI를 갱신합니다.</summary>
+        public void RefreshPlayerHand(List<CardDataSO> hand)
         {
-            var view = _cardCreate.CreateFieldCard(_dealerFieldContainer, card);
-            view.SetInteractable(false);
-            _dealerCards.Add(view);
+            ClearPlayerHand();
+            for (int i = 0; i < hand.Count; i++)
+                AddHandCard(hand[i], i);
         }
 
-        // ─── 블러 적용 ───────────────────────────────────────────
+        /// <summary>손패 카드를 추가합니다.</summary>
+        private void AddHandCard(CardDataSO card, int index)
+        {
+            int captured = index;
+            var view = _cardCreate.CreateHandCard(_playerHandContainer, card);
+            view.SetInteractable(true);
+            view.OnClicked += _ => OnHandCardClicked?.Invoke(captured);
+            _playerHandCards.Add(view);
+        }
+
+        /// <summary>손패를 초기화합니다.</summary>
+        public void ClearPlayerHand()
+        {
+            foreach (var v in _playerHandCards)
+                if (v is MonoBehaviour mb && mb != null)
+                    Destroy(mb.gameObject);
+            _playerHandCards.Clear();
+        }
 
         /// <summary>
-        /// 시야 비율에 따라 필드/딜러 카드 블러를 갱신합니다.
-        /// HUDManager.HandleVisionChanged에서 호출합니다.
+        /// 손패에서 카드를 제거하고 콜백을 재등록합니다.
         /// </summary>
-        public void ApplyBlur(float visionRatio)
+        public void RemoveFromHand(int index)
         {
-            float blur = visionRatio > 0.2f
-                ? 0f
-                : Mathf.InverseLerp(0.2f, 0f, visionRatio);
+            if (index < 0 || index >= _playerHandCards.Count) return;
 
-            foreach (var v in _fieldCards) v.SetBlurLevel(blur);
-            foreach (var v in _dealerCards) v.SetBlurLevel(blur);
+            var view = _playerHandCards[index];
+            if (view is MonoBehaviour mb && mb != null)
+                Destroy(mb.gameObject);
+
+            _playerHandCards.RemoveAt(index);
+            RebuildHandCallbacks();
+        }
+
+        /// <summary>손패 콜백을 현재 인덱스 기준으로 재등록합니다.</summary>
+        private void RebuildHandCallbacks()
+        {
+            for (int i = 0; i < _playerHandCards.Count; i++)
+            {
+                int captured = i;
+                _playerHandCards[i].ClearClickListeners();
+                _playerHandCards[i].OnClicked +=
+                    _ => OnHandCardClicked?.Invoke(captured);
+            }
+        }
+
+        /// <summary>손패 카드 선택 상태를 갱신합니다.</summary>
+        public void HighlightHandCard(int index)
+        {
+            for (int i = 0; i < _playerHandCards.Count; i++)
+                _playerHandCards[i].SetSelected(i == index);
         }
     }
 }

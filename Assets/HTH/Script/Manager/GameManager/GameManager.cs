@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace HTH
@@ -118,43 +117,64 @@ namespace HTH
         /// <summary>타이틀 화면을 표시합니다. GameUIManager 미연결 시 자동 진행합니다.</summary>
         private void UI_ShowTitle(System.Action onStart)
         {
-            if (_gameUI != null) { _gameUI.ShowTitle(onStart); return; }
+            // Title 패널 없음 — 바로 게임 시작
             Debug.Log("[GM] ShowTitle — 자동 진행");
             onStart?.Invoke();
         }
 
-        /// <summary>배팅 화면을 표시합니다. 현재 스테이지 정보를 함께 전달합니다.</summary>
+        /// <summary>배팅 화면을 표시합니다.</summary>
         private void UI_ShowBetting(int currentBet, System.Action<int> onConfirm)
         {
             if (_gameUI != null)
             {
-                _gameUI.SetBetPanelInfo(_stageManager.CurrentStage.stageIndex, _stageManager.CurrentStage.bustValue);
-                _gameUI.ShowBetting(currentBet, onConfirm);
+                _gameUI.SetupBetting(_stageManager.CurrentStage.visionBetMin, _visionManager.CurrentVision, onConfirm);
                 return;
             }
             Debug.Log($"[GM] ShowBetting — 자동 확정:{currentBet}");
             onConfirm?.Invoke(currentBet);
         }
 
-        /// <summary>플레이어 턴 화면을 표시합니다. Hit / Stay 콜백을 등록합니다.</summary>
+        /// <summary>플레이어 턴 화면을 표시합니다.</summary>
         private void UI_ShowPlayerTurn()
         {
             if (_gameUI != null)
             {
-                _gameUI.SetGamePanelInfo(_stageManager.CurrentStage.stageIndex, _stageManager.CurrentStage.bustValue);
-                _gameUI.ShowPlayerTurn(_playerHandManager.Field, _playerHandManager.Hand, OnHit, OnStand);
+                _gameUI.SetStageInfo(_stageManager.CurrentStage.stageIndex, _stageManager.CurrentStage.bustValue);
+                _gameUI.SetupGameButtons(OnHit, OnStand);
                 return;
             }
             Debug.Log("[GM] ShowPlayerTurn — 자동 Stand");
             OnStand();
         }
 
-        /// <summary>딜러 대기 화면을 표시합니다.</summary>
-        private void UI_ShowDealerThinking()
+        /// <summary>결과 화면을 표시합니다.</summary>
+        private void UI_ShowResult(string desc, bool win, System.Action onNext)
         {
-            if (_gameUI != null) { _gameUI.ShowDealerThinking(); return; }
-            Debug.Log("[GM] ShowDealerThinking");
+            if (_gameUI != null)
+            {
+                long playerTotal = _blackjackManager.EvaluatePlayer(_playerHandManager.Field, _stageManager.CurrentStage);
+                long dealerTotal = _blackjackManager.EvaluateDealer(_dealerManager.Field, _stageManager.CurrentStage);
+
+                _gameUI.ShowResult(desc, win, playerTotal, dealerTotal, 
+                    _stageManager.CurrentStage.bustValue, onNext);
+                return;
+            }
+            Debug.Log($"[GM] ShowResult — {desc} win:{win}");
+            onNext?.Invoke();
         }
+        /// <summary>딜러 값 표기</summary>
+        private void OnDealerTurnEnded()
+        {
+            _gameUI?.UpdateDealerValue(_dealerManager.Field, _stageManager.CurrentStage);
+            StartCoroutine(DelayedTransition(_resultDelay, GameState.Result));
+        }
+
+        /// <summary>딜러 대기 화면을 표시합니다.</summary>
+        //private void UI_ShowDealerThinking()
+        //{
+        //    if (_gameUI != null) { _gameUI?.show(); return; }
+        //    Debug.Log("[GM] ShowDealerThinking");
+        //}
 
         /// <summary>
         /// 플레이어 필드와 손패 UI를 갱신합니다.
@@ -163,15 +183,10 @@ namespace HTH
         private void UI_RefreshPlayerArea()
         {
             var stage = _stageManager.CurrentStage;
-            if (_gameUI != null)
-            {
-                _gameUI.RefreshPlayerArea(_playerHandManager.Field, _playerHandManager.Hand);
-                _gameUI.UpdateCurrentValue(_playerHandManager.Field, stage.bustValue, stage.useFlexibleAce,
-                    stage.bustValue);
-                return;
-            }
-            long val = _blackjackManager.EvaluatePlayer(_playerHandManager.Field, stage);
-            Debug.Log($"[GM] RefreshPlayer — value:{val:N0}");
+            if (_gameUI == null) return;
+
+            _gameUI.RefreshPlayerArea(_playerHandManager.Field, _playerHandManager.Hand);
+            _gameUI.UpdatePlayerValue(_playerHandManager.Field, stage);
         }
 
         /// <summary>
@@ -180,35 +195,13 @@ namespace HTH
         /// </summary>
         private void UI_RefreshDealerArea()
         {
-            if (_gameUI != null)
+            if (_gameUI == null)
             {
-                _gameUI.RefreshDealerArea(
-                    _dealerManager.Field,
-                    _dealerManager.HasHiddenCard);
+                long val = _blackjackManager.EvaluateDealer(_dealerManager.Field, _stageManager.CurrentStage);
+                Debug.Log($"[GM] RefreshDealer — value:{val:N0}");
                 return;
             }
-            long val = _blackjackManager.EvaluateDealer(
-                _dealerManager.Field, _stageManager.CurrentStage);
-            Debug.Log($"[GM] RefreshDealer — value:{val:N0}");
-        }
-
-        /// <summary>
-        /// 결과 화면을 표시합니다.
-        /// 플레이어 최종 연산값과 할당량 비교 정보를 함께 전달합니다.
-        /// </summary>
-        private void UI_ShowResult(string desc, bool win, System.Action onNext)
-        {
-            if (_gameUI != null)
-            {
-                long playerTotal = _blackjackManager.EvaluatePlayer(
-                    _playerHandManager.Field, _stageManager.CurrentStage);
-                _gameUI.SetResultInfo(
-                    playerTotal, _stageManager.CurrentStage.bustValue, win);
-                _gameUI.ShowResult(desc, win, onNext);
-                return;
-            }
-            Debug.Log($"[GM] ShowResult — {desc} win:{win}");
-            onNext?.Invoke();
+            _gameUI.RefreshDealerArea(_dealerManager.Field, _dealerManager.HasHiddenCard);
         }
 
         /// <summary>게임 오버 화면을 표시합니다.</summary>
@@ -285,20 +278,12 @@ namespace HTH
                 ai.SetBustThreshold(_stageManager.CurrentStage.bustValue);
 
             // 재도전/다음 스테이지 진입 시 버튼 재활성화
-            _gameUI.EnableGameButtons();
+            _gameUI?.EnableGameButtons();
+            _gameUI?.ClearDealerValue();
 
             // 패널 진입 시 딜러/플레이어 UI 초기화
             _gameUI?.RefreshDealerArea(_dealerManager.Field);
-            _gameUI?.RefreshPlayerArea(
-                _playerHandManager.Field,
-                _playerHandManager.Hand);
-
-            // 연산값 텍스트 초기화 (= 0 표시)
-            _gameUI?.UpdateCurrentValue(
-                _playerHandManager.Field,
-                _stageManager.CurrentStage.bustValue,
-                _stageManager.CurrentStage.useFlexibleAce,
-                _stageManager.CurrentStage.bustValue);
+            _gameUI?.RefreshPlayerArea(_playerHandManager.Field, _playerHandManager.Hand);
 
             // 초기 딜링 — 플레이어2장 / 딜러1장 공개 + 1장 비공개
             DealInitialCards();
@@ -306,7 +291,7 @@ namespace HTH
             // 손패 클릭 / 슬롯 클릭 이벤트 구독
             if (_gameUI != null)
             {
-                _gameUI.OnHandCardClicked += _playerHandManager.SelectHandCard;
+                _gameUI.OnHandCardClicked     += _playerHandManager.SelectHandCard;
                 _gameUI.OnOperatorSlotClicked += OnOperatorSlotSelected;
             }
 
@@ -611,9 +596,6 @@ namespace HTH
 
         /// <summary>DealerManager.OnDealerFieldChanged 핸들러 — 딜러 UI 갱신</summary>
         private void OnDealerFieldChanged() => UI_RefreshDealerArea();
-
-        /// <summary>DealerManager.OnDealerTurnEnded 핸들러 — Result 상태로 전환</summary>
-        private void OnDealerTurnEnded() => StartCoroutine(DelayedTransition(_resultDelay, GameState.Result));
 
         /// <summary>VisionManager.OnVisionDepleted 핸들러 — 시야 소진 시 GameOver 전환</summary>
         private void OnVisionDepleted() => TransitionTo(GameState.GameOver);

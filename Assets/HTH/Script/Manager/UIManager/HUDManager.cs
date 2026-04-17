@@ -6,171 +6,151 @@ using UnityEngine.UI;
 namespace HTH
 {
     /// <summary>
-    /// 스테이지 정보, 시야 바, 현재 연산값 등
-    /// 게임 중 상단 HUD와 패널 텍스트를 담당합니다.
+    /// 게임 중 HUD 텍스트를 관리합니다.
+    /// 플레이어 현재 값 / 딜러 Stay 후 값 표시.
+    /// normalJudge / reverseJudge 색상 분기.
+    ///
+    /// 색상 기준 (normalJudge)
+    /// ├── bustValue 초과        → 붉은색
+    /// ├── bustValue 80% 이상    → 노란색
+    /// ├── bustValue 일치        → 어두운 녹색
+    /// └── 그 외                → 흰색
+    ///
+    /// 색상 기준 (reverseJudge)
+    /// ├── bustValue 미만        → 붉은색
+    /// ├── bustValue 120% 이하   → 노란색
+    /// ├── bustValue 일치        → 어두운 녹색
+    /// └── 그 외                → 흰색
     /// </summary>
     public class HUDManager : MonoBehaviour
     {
-        // ─── Inspector — BetPanel ────────────────────────────────
-        [Header("BetPanel")]
-        [SerializeField] private TextMeshProUGUI _betStageText;
-        [SerializeField] private TextMeshProUGUI _betQuotaText;
-        [SerializeField] private TextMeshProUGUI _betVisionText;
-
-        // ─── Inspector — GamePanel ───────────────────────────────
-        [Header("GamePanel")]
+        // ─── Inspector ───────────────────────────────────────────
+        [Header("HUD 텍스트")]
+        [Tooltip("스테이지 텍스트")]
         [SerializeField] private TextMeshProUGUI _stageText;
-        [SerializeField] private TextMeshProUGUI _quotaText;
-        [SerializeField] private Image _visionBarFill;
-        [SerializeField] private TextMeshProUGUI _visionValueText;
-        [SerializeField] private TextMeshProUGUI _currentValueText;
 
-        // ─── Inspector — ResultPanel ─────────────────────────────
-        [Header("ResultPanel")]
-        [SerializeField] private TextMeshProUGUI _resultCompareText;
+        [Tooltip("bustValue 텍스트")]
+        [SerializeField] private TextMeshProUGUI _bustValueText;
 
-        // ─── 의존성 ───────────────────────────────────────────────
-        private FieldUIManager _fieldUIManager;
-        private HandUIManager _handUIManager;
+        [Tooltip("플레이어 현재 값 텍스트")]
+        [SerializeField] private TextMeshProUGUI _playerValueText;
 
-        // ─── 초기화 ───────────────────────────────────────────────
+        [Tooltip("딜러 Stay 후 값 텍스트")]
+        [SerializeField] private TextMeshProUGUI _dealerValueText;
 
-        /// <summary>
-        /// 블러 적용을 위해 FieldUIManager / HandUIManager를 주입합니다.
-        /// GameUIManager.Awake에서 호출합니다.
-        /// </summary>
-        public void Initialize(FieldUIManager fieldUI, HandUIManager handUI)
+        // ─── 색상 상수 ───────────────────────────────────────────
+        private static readonly Color ColorBust = UIColor.Hex("#F44336"); // 붉은색
+        private static readonly Color ColorClose = UIColor.Hex("#FFC107"); // 노란색
+        private static readonly Color ColorExact = UIColor.Hex("#388E3C"); // 어두운 녹색
+        private static readonly Color ColorDefault = UIColor.Hex("#E8E0D0"); // 흰색
+
+        // ─── 공개 API ─────────────────────────────────────────────
+
+        /// <summary>스테이지 정보를 갱신합니다.</summary>
+        public void SetStageInfo(int stageIndex, long bustValue)
         {
-            _fieldUIManager = fieldUI;
-            _handUIManager = handUI;
-        }
+            if (_stageText != null)
+                _stageText.text = $"STAGE {stageIndex}";
 
-        // ─── 생명주기 ─────────────────────────────────────────────
-
-        private void OnEnable()
-        {
-            if (VisionManager.Instance != null)
-                VisionManager.Instance.OnVisionChanged += HandleVisionChanged;
-        }
-
-        private void OnDisable()
-        {
-            if (VisionManager.Instance != null)
-                VisionManager.Instance.OnVisionChanged -= HandleVisionChanged;
-        }
-
-        // ─── BetPanel HUD ─────────────────────────────────────────
-
-        /// <summary>배팅 패널의 스테이지 정보를 갱신합니다.</summary>
-        public void SetBetPanelInfo(int stageIndex, long quota)
-        {
-            if (_betStageText != null) _betStageText.text = $"STAGE {stageIndex}";
-            if (_betQuotaText != null) _betQuotaText.text = $"할당량: {quota:N0}";
-            if (_betVisionText != null)
-                _betVisionText.text =
-                    $"보유 시야: {VisionManager.Instance?.CurrentVision}";
-        }
-
-        // ─── GamePanel HUD ────────────────────────────────────────
-
-        /// <summary>게임 패널 스테이지 정보를 갱신합니다.</summary>
-        public void SetGamePanelInfo(int stageIndex, long quota)
-        {
-            if (_stageText != null) _stageText.text = $"STAGE {stageIndex}";
-            if (_quotaText != null) _quotaText.text = $"할당량: {quota:N0}";
+            if (_bustValueText != null)
+                _bustValueText.text = $"목표: {bustValue:N0}";
         }
 
         /// <summary>
-        /// 현재 필드 연산값 텍스트를 갱신합니다.
-        /// 할당량 초과 시 빨간색, 일치 시 금색, 정상 시 흰색입니다.
+        /// 플레이어 현재 값을 갱신합니다.
+        /// normalJudge / reverseJudge에 따라 색상을 분기합니다.
         /// </summary>
-        public void UpdateCurrentValue(List<CardDataSO> field, long quota = 0, bool flexibleAce = false,
-            long bustThreshold = 21, bool currentValueSet = true)
+        public void UpdatePlayerValue(
+            List<CardDataSO> field,
+            StageDataSO stage)
         {
-            if (_currentValueText == null) return;
+            if (_playerValueText == null) return;
 
-            if (field.Count == 0)
+            if (field == null || field.Count == 0)
             {
-                _currentValueText.text = "= 0";
-                _currentValueText.color = UIColor.Hex("#E8E0D0");
+                _playerValueText.text = "= 0";
+                _playerValueText.color = ColorDefault;
                 return;
             }
 
-            long value = ExpressionEvaluator.Evaluate(field, flexibleAce, bustThreshold);
-            _currentValueText.text = $"= {value:N0}";
+            long value = ExpressionEvaluator.Evaluate(
+                field,
+                stage.useFlexibleAce,
+                stage.bustValue,
+                stage.allowNegative);
 
-            if (currentValueSet)
+            _playerValueText.text = $"= {value:N0}";
+            _playerValueText.color = GetValueColor(value, stage);
+        }
+
+        /// <summary>
+        /// 딜러 Stay 후 값을 갱신합니다.
+        /// 딜러 턴 종료 시 GameUIManager가 호출합니다.
+        /// </summary>
+        public void UpdateDealerValue(
+            List<CardDataSO> field,
+            StageDataSO stage)
+        {
+            if (_dealerValueText == null) return;
+
+            if (field == null || field.Count == 0)
             {
-                // 높아야 하는 스테이지 — 초과 시 빨강
-                if (quota > 0 && value > quota)
-                    _currentValueText.color = UIColor.Hex("#F44336");
-                else if (quota > 0 && value == quota)
-                    _currentValueText.color = UIColor.Hex("#FFD700");
-                else
-                    _currentValueText.color = UIColor.Hex("#E8E0D0");
+                _dealerValueText.text = "—";
+                _dealerValueText.color = ColorDefault;
+                return;
+            }
+
+            long value = ExpressionEvaluator.Evaluate(
+                field,
+                stage.useFlexibleAce,
+                stage.bustValue,
+                stage.allowNegative);
+
+            _dealerValueText.text = $"딜러: {value:N0}";
+            _dealerValueText.color = GetValueColor(value, stage);
+        }
+
+        /// <summary>딜러 값 텍스트를 초기화합니다.</summary>
+        public void ClearDealerValue()
+        {
+            if (_dealerValueText == null) return;
+            _dealerValueText.text = "—";
+            _dealerValueText.color = ColorDefault;
+        }
+
+        // ─── 색상 판정 ────────────────────────────────────────────
+
+        /// <summary>
+        /// 값에 따른 색상을 반환합니다.
+        /// normalJudge  : bustValue 초과→붉은색 / 80%이상→노란색 / 일치→녹색
+        /// reverseJudge : bustValue 미만→붉은색 / 120%이하→노란색 / 일치→녹색
+        /// </summary>
+        private Color GetValueColor(long value, StageDataSO stage)
+        {
+            long bustValue = stage.bustValue;
+
+            if (stage.normalJudge)
+            {
+                // 기본 판별 — bustValue 이하가 목표
+                if (value > bustValue)
+                    return ColorBust;                          // 초과 — 버스트
+                if (value == bustValue)
+                    return ColorExact;                         // 일치
+                if (value >= (long)(bustValue * 0.8f))
+                    return ColorClose;                         // 80% 이상 근접
+                return ColorDefault;                           // 여유
             }
             else
             {
-                // 낮아야 하는 스테이지 — 미달 시 빨강
-                if (quota > 0 && value > quota)
-                    _currentValueText.color = UIColor.Hex("#F44336");
-                else if (quota > 0 && value == quota)
-                    _currentValueText.color = UIColor.Hex("#FFD700");
-                else
-                    _currentValueText.color = UIColor.Hex("#E8E0D0");
+                // 리버스 판별 — bustValue 이상이 목표
+                if (value < bustValue)
+                    return ColorBust;                          // 미만 — 버스트
+                if (value == bustValue)
+                    return ColorExact;                         // 일치
+                if (value <= (long)(bustValue * 1.2f))
+                    return ColorClose;                         // 120% 이하 근접
+                return ColorDefault;                           // 여유
             }
-        }
-
-        // ─── ResultPanel ──────────────────────────────────────────
-
-        /// <summary>결과 패널의 수치 비교 텍스트를 갱신합니다.</summary>
-        public void SetResultInfo(long finalValue, long quota, bool win)
-        {
-            if (_resultCompareText == null) return;
-
-            _resultCompareText.text = win
-                ? $"{finalValue:N0} ≤ {quota:N0}"
-                : $"{finalValue:N0} > {quota:N0}";
-
-            _resultCompareText.color = win
-                ? UIColor.Hex("#FFD700")
-                : UIColor.Hex("#F44336");
-        }
-
-        // ─── Vision 이벤트 ────────────────────────────────────────
-
-        /// <summary>
-        /// VisionManager.OnVisionChanged 핸들러.
-        /// 시야 바 갱신 + 카드 블러 적용을 처리합니다.
-        /// </summary>
-        private void HandleVisionChanged(int current, int max)
-        {
-            float ratio = (float)current / max;
-            UpdateVisionBar(current, ratio);
-
-            _fieldUIManager?.ApplyBlur(ratio);
-            _handUIManager?.ApplyBlur(ratio);
-        }
-
-        /// <summary>시야 바 비율과 색상을 갱신합니다.</summary>
-        private void UpdateVisionBar(int current, float ratio)
-        {
-            if (_visionBarFill != null)
-            {
-                _visionBarFill.rectTransform.anchorMax = new Vector2(ratio, 1f);
-                _visionBarFill.color = ratio > 0.5f
-                    ? Color.Lerp(
-                        UIColor.Hex("#FFC107"),
-                        UIColor.Hex("#4CAF50"),
-                        (ratio - 0.5f) * 2f)
-                    : Color.Lerp(
-                        UIColor.Hex("#F44336"),
-                        UIColor.Hex("#FFC107"),
-                        ratio * 2f);
-            }
-
-            if (_visionValueText != null)
-                _visionValueText.text = current.ToString();
         }
     }
 }

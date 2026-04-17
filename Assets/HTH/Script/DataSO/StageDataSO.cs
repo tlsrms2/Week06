@@ -47,10 +47,6 @@ namespace HTH
         [Tooltip("이 스테이지 최대 배팅량")]
         public int visionBetMax = 50;
 
-        [Header("버스트 기준 값")]
-        [Tooltip("true: 이 값보다 높아야한다, false: 이 값보다 낮아야 한다")]
-        public bool currentValueSet = false;
-
         [Tooltip("true = Ace를 1 또는 11 중 유리한 값으로 자동 계산 (Stage 1 블랙잭 룰)")]
         public bool useFlexibleAce = true;
     }

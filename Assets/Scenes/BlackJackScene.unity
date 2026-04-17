@@ -1699,6 +1699,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HTH.GameManager
   _stageRegistry: {fileID: 11400000, guid: eca8fc680370c3345af2eb20b4fcad78, type: 2}
   _gameUI: {fileID: 1005564277}
+  _bustDelay: 1.5
+  _standDelay: 1
+  _resultDelay: 1.5
 --- !u!1 &668425488
 GameObject:
   m_ObjectHideFlags: 0

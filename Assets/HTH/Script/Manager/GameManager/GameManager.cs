@@ -167,7 +167,7 @@ namespace HTH
             {
                 _gameUI.RefreshPlayerArea(_playerHandManager.Field, _playerHandManager.Hand);
                 _gameUI.UpdateCurrentValue(_playerHandManager.Field, stage.bustValue, stage.useFlexibleAce,
-                    stage.bustValue, stage.currentValueSet);
+                    stage.bustValue);
                 return;
             }
             long val = _blackjackManager.EvaluatePlayer(_playerHandManager.Field, stage);
@@ -298,8 +298,7 @@ namespace HTH
                 _playerHandManager.Field,
                 _stageManager.CurrentStage.bustValue,
                 _stageManager.CurrentStage.useFlexibleAce,
-                _stageManager.CurrentStage.bustValue,
-                _stageManager.CurrentStage.currentValueSet);
+                _stageManager.CurrentStage.bustValue);
 
             // 초기 딜링 — 플레이어2장 / 딜러1장 공개 + 1장 비공개
             DealInitialCards();
@@ -512,7 +511,6 @@ namespace HTH
 
                 Debug.Log($"[GM] Hit — total:{_blackjackManager.EvaluatePlayer(_playerHandManager.Field, _stageManager.CurrentStage)} " +
                           $"bustValue:{_stageManager.CurrentStage.bustValue} " +
-                          $"currentValueSet:{_stageManager.CurrentStage.currentValueSet} " +
                           $"bust:{bust}");
 
                 if (bust)
@@ -570,16 +568,7 @@ namespace HTH
         {
             if (_playerHandManager.Field.Count == 0) return;
 
-            // 높아야 하는 스테이지 — Stay 시 최종 버스트 체크
-            if (_blackjackManager.IsFinalBust(_playerHandManager.Field, _stageManager.CurrentStage))
-            {
-                UI_RefreshPlayerArea();
-                Debug.Log("[GM] Stay — 최종 미달 버스트");
-                ExitPlayerTurn();
-                StartCoroutine(DelayedTransition(_bustDelay, GameState.Result));
-                return;
-            }
-
+            // IsFinalBust 제거 — Stay 후 무조건 딜러 턴으로
             ExitPlayerTurn();
             StartCoroutine(DelayedTransition(_standDelay, GameState.DealerTurn));
         }

@@ -13,6 +13,4 @@ MonoBehaviour:
   m_Name: StageRegistry
   m_EditorClassIdentifier: Assembly-CSharp::HTH.StageRegistrySO
   stages:
-  - {fileID: 11400000, guid: 652708af3ae008b458a9dcfb72e456a3, type: 2}
   - {fileID: 11400000, guid: 4044d073639b41c4fa6eaef1dc827ad6, type: 2}
-  - {fileID: 11400000, guid: d8ff9fa667b1d5d4f8fd8fe2a76cd3a8, type: 2}

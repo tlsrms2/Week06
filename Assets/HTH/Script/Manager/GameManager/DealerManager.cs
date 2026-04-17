@@ -90,18 +90,35 @@ namespace HTH
 
             while (true)
             {
-                // 연산자 자동 배치 시도 (Stage 2+)
+                // 연산자 자동 배치 시도
                 if (stage.useOperatorCards && Hand.Count > 0)
                     TryAutoPlaceOperator(dealerStrategy, stage);
 
-                long total = ExpressionEvaluator.Evaluate(Field, stage.useFlexibleAce, stage.bustValue);
+                long total = ExpressionEvaluator.Evaluate(
+                    Field, stage.useFlexibleAce, stage.bustValue);
 
-                // 딜러 버스트 즉시 중단
-                if (stage.currentValueSet && total > stage.bustValue) break;
-                if (!stage.currentValueSet && total <= stage.bustValue) break;
+                Debug.Log($"[Dealer] total:{total} bustValue:{stage.bustValue}");
 
-                if (!dealerStrategy.ShouldHit(total, stage)) break;
-                if (!deckRunner.TryDraw(out CardDataSO card)) break;
+                // 딜러 버스트 — 즉시 중단
+                if (total > stage.bustValue)
+                {
+                    Debug.Log("[Dealer] 버스트 — 턴 종료");
+                    break;
+                }
+
+                // ShouldHit 조건 미충족 — 히트 중단
+                if (!dealerStrategy.ShouldHit(total, stage))
+                {
+                    Debug.Log("[Dealer] ShouldHit false — 턴 종료");
+                    break;
+                }
+
+                // 덱 소진
+                if (!deckRunner.TryDraw(out CardDataSO card))
+                {
+                    Debug.Log("[Dealer] 덱 소진 — 턴 종료");
+                    break;
+                }
 
                 if (card.cardType == CardType.Number)
                 {
@@ -111,7 +128,6 @@ namespace HTH
                 }
                 else if (stage.useOperatorCards)
                 {
-                    // 연산자 카드는 손패에 보관
                     Hand.Add(card);
                     OnDealerFieldChanged?.Invoke();
                     yield return new WaitForSeconds(0.3f);
@@ -123,6 +139,20 @@ namespace HTH
                 TryAutoPlaceOperator(dealerStrategy, stage);
 
             OnDealerTurnEnded?.Invoke();
+        }
+
+        /// <summary>
+        /// bustValue에 가장 근접한 결과를 내는 연산자를 선택합니다.
+        /// 버스트(초과)하는 결과는 최저점으로 처리합니다.
+        /// </summary>
+        private long ScoreResult(long result, StageDataSO stage)
+        {
+            // 버스트 → 최저점
+            if (result > stage.bustValue) return long.MinValue;
+
+            // bustValue에 근접할수록 높은 점수
+            // 차이가 작을수록 좋으므로 음수로 변환
+            return -(stage.bustValue - result);
         }
 
         // ─── AI 연산자 자동 배치 ──────────────────────────────────
@@ -186,28 +216,6 @@ namespace HTH
             }
 
             return bestOp;
-        }
-
-        /// <summary>
-        /// 결과값을 점수로 변환합니다.
-        /// currentValueSet = true  : bustValue 이하 최대값이 높은 점수
-        /// currentValueSet = false : bustValue 이상 최소값이 높은 점수
-        /// 버스트 시 최저점 반환합니다.
-        /// </summary>
-        private long ScoreResult(long result, StageDataSO stage)
-        {
-            if (stage.currentValueSet)
-            {
-                // 높아야 하는 스테이지 — 버스트 없이 최대한 높을수록 좋음
-                if (result > stage.bustValue) return long.MinValue;
-                return result;
-            }
-            else
-            {
-                // 낮아야 하는 스테이지 — 버스트 없이 최대한 낮을수록 좋음
-                if (result < stage.bustValue) return long.MinValue;
-                return -result; // 낮을수록 높은 점수
-            }
         }
 
         /// <summary>

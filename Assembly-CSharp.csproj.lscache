@@ -40,23 +40,24 @@ CommandLineArgsForDesignTimeEvaluation=-langversion:9.0 -define:UNITY_6000_3_9;U
 /warnaserror+:NU1605
 
 [sourceFiles]
-Assets/
- Animations/AnimationTriggerController.cs
- Package_AlchemistHouse/Scripts/
-  FreeCamera.cs
-  VolumetricLight.cs
-  VolumetricLightRenderer.cs
- Scripts/Core/
-  ExpressionEvaluator.cs
-  GameManager.cs
-  VisionManager.cs
- Scripts/Data/
-  CardData.cs
-  StageData.cs
- Scripts/
-  Effects/VisionEffect.cs
-  UI/GameUI.cs
- TutorialInfo/Scripts/Readme.cs
+Assets/Animations/
+ AnimationTriggerController.cs
+ DealerSequenceController.cs
+Assets/Package_AlchemistHouse/Scripts/
+ FreeCamera.cs
+ VolumetricLight.cs
+ VolumetricLightRenderer.cs
+Assets/Scripts/Core/
+ ExpressionEvaluator.cs
+ GameManager.cs
+ VisionManager.cs
+Assets/Scripts/Data/
+ CardData.cs
+ StageData.cs
+Assets/Scripts/
+ Effects/VisionEffect.cs
+ UI/GameUI.cs
+Assets/TutorialInfo/Scripts/Readme.cs
 Temp/obj/Assembly-CSharp/.NETStandard,Version=v2.1.AssemblyAttributes.cs
 
 [metadataReferences]

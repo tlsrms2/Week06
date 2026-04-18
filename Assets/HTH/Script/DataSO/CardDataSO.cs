@@ -2,60 +2,44 @@
 
 namespace HTH
 {
-    public enum CardType { Number, Operator }
-    public enum OperatorType { None, Subtract, Multiply, Divide }
-
+    /// <summary>
+    /// 카드의 게임 데이터만 정의합니다.
+    /// 비주얼 데이터는 SuitDataSO가 담당합니다.
+    ///
+    /// 숫자 카드 : numberValue + suit → SuitDataSO에서 프리팹/UV 조회
+    /// 연산자 카드 : operatorType + JokerPrefab + uvOffset
+    /// </summary>
     [CreateAssetMenu(fileName = "CardData", menuName = "Blindjack/Card Data")]
     public class CardDataSO : ScriptableObject
     {
-        [Header("카드 기본 정보")]
-        [Tooltip("숫자 카드 / 연산자 카드")]
+        [Header("게임 데이터")]
         public CardType cardType;
-
-        [Tooltip("숫자 카드일 때의 값 (1=A, 11=J, 12=Q, 13=K)")]
         public int numberValue;
-
-        [Tooltip("연산자 카드일 때의 연산자 종류")]
         public OperatorType operatorType;
-
-        [Tooltip("카드에 표시될 문자열 (A, J, Q, K, ×, ÷ 등)")]
         public string displayLabel;
 
-        [Header("3D 카드 비주얼")]
-        [Tooltip("카드 앞면 텍스처 — 없으면 displayLabel 텍스트로 대체")]
-        public Texture2D frontTexture;
+        [Header("연산자 카드 비주얼 (Operator 전용)")]
+        [Tooltip("연산자 카드 프리팹 (Joker 프리팹)")]
+        public GameObject jokerPrefab;
 
-        [Tooltip("카드 뒷면 텍스처 — 없으면 기본 뒷면 색상으로 대체")]
-        public Texture2D backTexture;
+        [Tooltip("연산자 카드 UV Offset")]
+        public Vector2 operatorUvOffset;
 
-        [Tooltip("카드 가운데 레이어 프리팹 — 앞면과 뒷면 사이에 배치되는 얇은 프리미티브")]
-        public GameObject middlePrimitivePrefab;
+        [Tooltip("연산자 카드 공유 Material")]
+        public Material operatorMaterial;
 
-
+        [Tooltip("연산자 카드 UV Scale")]
+        public Vector2 operatorUvScale = new Vector2(1f, 1f);
 
         // ─── 유틸 프로퍼티 ───────────────────────────────────────
 
-        // CardDataSO.cs 에 추가
-        /// <summary>
-        /// 블랙잭 기준 카드 실제 값을 반환합니다.
-        /// J(11), Q(12), K(13)은 블랙잭 룰에 따라 10으로 처리합니다.
-        /// A(1)는 FlexibleAce 설정에 따라 ExpressionEvaluator에서 별도 처리합니다.
-        /// </summary>
         public int BlackjackValue => numberValue > 10 ? 10 : numberValue;
-
-        /// <summary>앞면 텍스처가 설정되어 있는지 확인합니다.</summary>
-        public bool HasFrontTexture => frontTexture != null;
-
-        /// <summary>뒷면 텍스처가 설정되어 있는지 확인합니다.</summary>
-        public bool HasBackTexture => backTexture != null;
-
-        /// <summary>가운데 프리미티브 프리팹이 설정되어 있는지 확인합니다.</summary>
-        public bool HasMiddlePrimitive => middlePrimitivePrefab != null;
 
 #if UNITY_EDITOR
         private void OnValidate()
         {
-            if (cardType == CardType.Number && string.IsNullOrEmpty(displayLabel))
+            if (cardType == CardType.Number
+             && string.IsNullOrEmpty(displayLabel))
             {
                 displayLabel = numberValue switch
                 {
@@ -66,7 +50,8 @@ namespace HTH
                     _ => numberValue.ToString()
                 };
             }
-            else if (cardType == CardType.Operator && string.IsNullOrEmpty(displayLabel))
+            else if (cardType == CardType.Operator
+                  && string.IsNullOrEmpty(displayLabel))
             {
                 displayLabel = operatorType switch
                 {

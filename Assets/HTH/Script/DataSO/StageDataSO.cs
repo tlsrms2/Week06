@@ -17,6 +17,14 @@ namespace HTH
         [Tooltip("이 스테이지의 목표 할당량")]
         public long bustValue;
 
+        [Header("드로우 제한")]
+        [Tooltip("플레이어 최대 Hit 횟수 — 0이면 덱 소진까지 무제한")]
+        public int maxHitCount = 0;
+
+        [Header("드로우 설정")]
+        [Tooltip("true = Hit 시 연산자 카드만 드로우 (숫자는 초기 딜링으로 모두 지급)")]
+        public bool operatorOnlyHit = false;
+
         [Header("덱 설정")]
         [Tooltip("사용할 덱 SO — Standard52 또는 Custom")]
         public DeckSO deck;
@@ -24,6 +32,16 @@ namespace HTH
         [Header("스테이지 규칙 플래그")]
         [Tooltip("true = 연산자 카드가 덱에 포함됨 (Stage 2+)")]
         public bool useOperatorCards = false;
+        [Header("판별식 설정")]
+        [Tooltip("true = 기본 판별식 (bustValue 초과 시 버스트)\n" +
+         "false = 리버스 판별식 (bustValue 미만 시 버스트)")]
+        public bool normalJudge = true;
+
+        [Tooltip("true = 음수 허용 false = 0 미만이면 0으로 고정")]
+        public bool allowNegative = false;
+
+        [Tooltip("true = Ace를 1 또는 11 중 유리한 값으로 자동 계산 (Stage 1 블랙잭 룰)")]
+        public bool useFlexibleAce = true;
 
         [Tooltip("연산자 카드 비율 (덱 전체 대비, 0.0~1.0) useOperatorCards = true일 때 사용")]
         [Range(0f, 0.3f)]
@@ -38,12 +56,5 @@ namespace HTH
 
         [Tooltip("이 스테이지 최대 배팅량")]
         public int visionBetMax = 50;
-
-        [Header("버스트 기준 값")]
-        [Tooltip("true: 이 값보다 높아야한다, false: 이 값보다 낮아야 한다")]
-        public bool currentValueSet = false;
-
-        [Tooltip("true = Ace를 1 또는 11 중 유리한 값으로 자동 계산 (Stage 1 블랙잭 룰)")]
-        public bool useFlexibleAce = true;
     }
 }

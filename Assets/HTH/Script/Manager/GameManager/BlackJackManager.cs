@@ -1,13 +1,22 @@
 ﻿using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 
 namespace HTH
 {
     /// <summary>
-    /// 블랙잭 룰 적용, 승패 판정, 버스트 감지를 담당합니다.
-    /// 스테이지별로 표준 블랙잭(Stage 1)과
-    /// 할당량 기반 룰(Stage 2+)을 분기합니다.
+    /// 블랙잭 룰 담당 Manager.
+    ///
+    /// 1단계 : 기본 블랙잭 룰
+    ///   - bustValue 초과 시 버스트
+    ///   - bustValue에 더 근접한 쪽 승리
+    ///
+    /// 2단계 : 사칙연산 룰
+    ///   - bustValue가 스테이지마다 변경됨
+    ///   - 연산자 카드(+,-,×,÷)를 숫자 카드 사이에 배치
+    ///   - 좌→우 순차 연산으로 합산
+    ///   - 딜러도 연산자를 활용해 bustValue에 근접
+    ///   - 승패 판정 방식은 1단계와 동일
+    ///     (bustValue에 더 근접한 쪽 승리)
     /// </summary>
     public class BlackjackManager : MonoBehaviour
     {
@@ -15,7 +24,8 @@ namespace HTH
         private IDealerStrategy _dealerStrategy;
 
         // ─── 초기화 ───────────────────────────────────────────────
-        /// <summary>딜러 전략을 주입합니다. GameManager가 Awake에서 호출합니다.</summary>
+
+        /// <summary>딜러 전략을 주입합니다.</summary>
         public void Initialize(IDealerStrategy dealerStrategy)
         {
             _dealerStrategy = dealerStrategy;
@@ -24,113 +34,152 @@ namespace HTH
         // ─── 연산 ─────────────────────────────────────────────────
 
         /// <summary>
-        /// 스테이지 설정으로 플레이어 필드를 연산합니다.
-        /// FlexibleAce / bustThreshold를 StageDataSO에서 읽습니다.
+        /// 플레이어 필드를 연산합니다.
+        /// 연산자 카드가 포함되어 있으면 좌→우 순차 연산합니다.
+        /// useFlexibleAce = true면 Ace를 1 또는 11로 자동 선택합니다.
         /// </summary>
         public long EvaluatePlayer(List<CardDataSO> field, StageDataSO stage)
-            => ExpressionEvaluator.Evaluate(field, stage.useFlexibleAce, stage.bustValue);
+            => ExpressionEvaluator.Evaluate(field, stage.useFlexibleAce, 
+                stage.bustValue, stage.allowNegative);
 
         /// <summary>딜러 필드를 연산합니다.</summary>
         public long EvaluateDealer(List<CardDataSO> field, StageDataSO stage)
-            => ExpressionEvaluator.Evaluate(field, stage.useFlexibleAce, stage.bustValue);
+            => ExpressionEvaluator.Evaluate(field, stage.useFlexibleAce,
+                stage.bustValue, stage.allowNegative);
 
         // ─── 버스트 감지 ──────────────────────────────────────────
 
         /// <summary>
-        /// 플레이어가 버스트 상태인지 확인합니다.
-        /// currentValueSet = true  : bustValue 초과 시 버스트 (높아야 하는 스테이지)
-        /// currentValueSet = false : bustValue 미달 시 버스트 (낮아야 하는 스테이지)
+        /// HIT 중 플레이어 버스트 여부를 확인합니다.
+        ///
+        /// 기본 블랙잭 / 사칙연산 공통
+        /// → 합산이 bustValue를 초과하면 버스트
+        ///
+        /// 단, 연산자 배치 전에는 버스트 감지를 하지 않습니다.
+        /// (숫자만 있는 상태에서는 연산자로 값을 낮출 수 있으므로)
         /// </summary>
         public bool IsPlayerBust(List<CardDataSO> field, StageDataSO stage)
         {
+            // 연산자 스테이지 — 연산자 미배치 시 스킵
+            if (stage.useOperatorCards && !HasOperatorPlaced(field))
+                return false;
+
             long total = EvaluatePlayer(field, stage);
 
-            return stage.currentValueSet
-                ? total > stage.bustValue   // 높아야 하는 경우 — 초과하면 버스트
-                : total < stage.bustValue;  // 낮아야 하는 경우 — 미달하면 버스트
+            // 연산자 스테이지이고 손패에 연산자가 있으면 스킵
+            // → GameManager에서 hand 정보를 넘겨줘야 하므로
+            //    여기서는 필드에 연산자가 없을 때만 체크
+            if (stage.useOperatorCards && !HasOperatorPlaced(field))
+                return false;
+
+            return stage.normalJudge
+                ? total > stage.bustValue   // 기본 — 초과면 버스트
+                : total < stage.bustValue;  // 리버스 — 미만이면 버스트
         }
         /// <summary>
         /// Stay 후 최종 버스트 여부를 확인합니다.
-        /// currentValueSet = true  : bustValue 미만이면 실패 (목표값에 못 미침)
-        /// currentValueSet = false : bustValue 초과면 실패 (목표값을 넘김)
-        /// IsPlayerBust와 달리 Stay 확정 시점에만 호출합니다.
         /// </summary>
         public bool IsFinalBust(List<CardDataSO> field, StageDataSO stage)
         {
             long total = EvaluatePlayer(field, stage);
 
-            return stage.currentValueSet
-                ? total < stage.bustValue   // 높아야 함 → 미만이면 실패
-                : total > stage.bustValue;  // 낮아야 함 → 초과면 실패
+            return stage.normalJudge
+                ? total > stage.bustValue   // 기본 — 초과면 버스트
+                : total < stage.bustValue;  // 리버스 — 미만이면 버스트
+        }
+
+        /// <summary>
+        /// Field에 연산자 카드가 배치되어 있는지 확인합니다.
+        /// </summary>
+        private bool HasOperatorPlaced(List<CardDataSO> field)
+        {
+            foreach (var card in field)
+                if (card.cardType == CardType.Operator) return true;
+            return false;
         }
 
         // ─── 승패 판정 ────────────────────────────────────────────
 
         /// <summary>
-        /// 스테이지 룰에 따라 승패를 판정합니다.
+        /// 승패를 판정합니다.
         ///
-        /// Stage 1 (표준 블랙잭)
-        ///   - 21 초과 → 플레이어 버스트 패배
-        ///   - 딜러 21 초과 → 딜러 버스트 승리
-        ///   - 플레이어 >= 딜러 → 승리
+        /// 기본 블랙잭 / 사칙연산 공통 룰
+        /// ├── 플레이어 bustValue 초과 → 패배 (버스트)
+        /// ├── 딜러 bustValue 초과     → 승리 (딜러 버스트)
+        /// └── bustValue에 더 근접한 쪽 승리
+        ///     동점 → 무승부 (패배 처리)
         ///
-        /// Stage 2+ currentValueSet = true (높아야 하는 스테이지)
-        ///   - bustValue 미만 → 패배
-        ///   - 딜러 bustValue 미만 → 딜러 실패 → 승리
-        ///   - 플레이어 >= 딜러 → 승리
-        ///
-        /// Stage 2+ currentValueSet = false (낮아야 하는 스테이지)
-        ///   - bustValue 초과 → 패배
-        ///   - 딜러 bustValue 초과 → 딜러 버스트 → 승리
-        ///   - 플레이어 <= 딜러 → 승리 (낮을수록 유리)
+        /// bustValue가 21이면 기본 블랙잭과 동일하게 동작합니다.
+        /// bustValue가 다른 값이면 그 값에 근접한 쪽이 승리합니다.
+        /// 
+        /// normalJudge = true  : bustValue 이하 최대값이 유리
+        /// normalJudge = false : bustValue 이상 최소값이 유리
         /// </summary>
         public bool JudgeResult(long playerTotal, long dealerTotal, StageDataSO stage)
         {
-            if (stage.currentValueSet)
+            if (stage.normalJudge)
             {
-                // 높아야 하는 스테이지
-                bool playerFail = playerTotal < stage.bustValue;
-                bool dealerFail = dealerTotal < _dealerStrategy.BustThreshold;
-                if (playerFail) return false;
-                if (dealerFail) return true;
-                return playerTotal >= dealerTotal; // 높을수록 유리
+                // 기본 판별식
+                if (playerTotal > stage.bustValue) return false; // 플레이어 버스트
+                if (dealerTotal > stage.bustValue) return true;  // 딜러 버스트
+
+                // bustValue에 더 근접한 쪽 승리
+                long playerDiff = stage.bustValue - playerTotal;
+                long dealerDiff = stage.bustValue - dealerTotal;
+
+                if (playerDiff < dealerDiff) return true;
+                if (playerDiff > dealerDiff) return false;
+                return false; // 동점 → 패배
             }
             else
             {
-                // 낮아야 하는 스테이지
-                bool playerBust = playerTotal > stage.bustValue;
-                bool dealerBust = dealerTotal > _dealerStrategy.BustThreshold;
-                if (playerBust) return false;
-                if (dealerBust) return true;
-                return playerTotal <= dealerTotal; // 낮을수록 유리
+                // 리버스 판별식
+                if (playerTotal < stage.bustValue) return false; // 플레이어 버스트
+                if (dealerTotal < stage.bustValue) return true;  // 딜러 버스트
+
+                // bustValue에 더 근접한 쪽 승리 (아래에서 접근)
+                long playerDiff = playerTotal - stage.bustValue;
+                long dealerDiff = dealerTotal - stage.bustValue;
+
+                if (playerDiff < dealerDiff) return true;
+                if (playerDiff > dealerDiff) return false;
+                return false; // 동점 → 패배
             }
         }
+
         /// <summary>결과 설명 문자열을 생성합니다.</summary>
         public string BuildResultDescription(long playerTotal, long dealerTotal, StageDataSO stage, bool win)
         {
-
-            if (stage.currentValueSet)
+            if (stage.normalJudge)
             {
-                // 높아야 하는 스테이지
-                if (playerTotal < stage.bustValue)
-                    return $"미달! {playerTotal:N0} < {stage.bustValue:N0}";
-                if (dealerTotal < stage.bustValue)
-                    return $"딜러 미달! — 플레이어 승리";
-                return win
-                    ? $"승리! {playerTotal:N0} ≥ {dealerTotal:N0}"
-                    : $"패배. {playerTotal:N0} < {dealerTotal:N0}";
-            }
-            else
-            {
-                // 낮아야 하는 스테이지
                 if (playerTotal > stage.bustValue)
                     return $"버스트! {playerTotal:N0} > {stage.bustValue:N0}";
                 if (dealerTotal > stage.bustValue)
-                    return $"딜러 버스트! — 플레이어 승리";
-                return win
-                    ? $"성공! {playerTotal:N0} ≤ {dealerTotal:N0}"
-                    : $"실패. {playerTotal:N0} > {dealerTotal:N0}";
+                    return $"딜러 버스트! 딜러: {dealerTotal:N0}";
             }
+            else
+            {
+                if (playerTotal < stage.bustValue)
+                    return $"버스트! {playerTotal:N0} < {stage.bustValue:N0}";
+                if (dealerTotal < stage.bustValue)
+                    return $"딜러 버스트! 딜러: {dealerTotal:N0}";
+            }
+
+            long playerDiff = stage.normalJudge
+                ? stage.bustValue - playerTotal
+                : playerTotal - stage.bustValue;
+            long dealerDiff = stage.normalJudge
+                ? stage.bustValue - dealerTotal
+                : dealerTotal - stage.bustValue;
+
+            if (playerDiff == dealerDiff)
+                return $"무승부. 둘 다 {stage.bustValue:N0}까지 {playerDiff:N0} 차이";
+
+            return win
+                ? $"승리! {playerTotal:N0} (차이:{playerDiff:N0}) " +
+                  $"vs 딜러 {dealerTotal:N0} (차이:{dealerDiff:N0})"
+                : $"패배. {playerTotal:N0} (차이:{playerDiff:N0}) " +
+                  $"vs 딜러 {dealerTotal:N0} (차이:{dealerDiff:N0})";
         }
 
         // ─── 공개 API ─────────────────────────────────────────────

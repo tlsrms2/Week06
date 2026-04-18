@@ -1,72 +1,84 @@
-using System.Collections.Generic;
+ï»¿using System.Collections.Generic;
 using UnityEngine;
 
 namespace HTH
 {
-    /// <summary>
-    /// Ä«µå µ¦À» °ü¸®ÇÕ´Ï´Ù.
-    /// Ç¥ÁØ 52Àå µ¦À» »ı¼ºÇÏ°Å³ª Ä¿½ºÅÒ µ¦À» Inspector¿¡¼­ ±¸¼ºÇÒ ¼ö ÀÖ½À´Ï´Ù.
-    /// </summary>
     [CreateAssetMenu(fileName = "Deck", menuName = "Blindjack/Deck")]
     public class DeckSO : ScriptableObject
     {
-        public enum DeckType
-        {
-            /// <summary>Ç¥ÁØ ºí·¢Àè 52Àå µ¦ (ÀÚµ¿ »ı¼º)</summary>
-            Standard52,
-            /// <summary>Inspector¿¡¼­ Á÷Á¢ ±¸¼ºÇÑ Ä¿½ºÅÒ µ¦</summary>
-            Custom
-        }
+        public enum DeckType { Standard52, Custom }
 
-        [Header("µ¦ Å¸ÀÔ")]
-        [Tooltip("Standard52: Ç¥ÁØ 52Àå ÀÚµ¿ »ı¼º / Custom: Á÷Á¢ ±¸¼º")]
+        [Header("ë± ì„¤ì •")]
         public DeckType deckType = DeckType.Standard52;
 
-        [Header("Ä¿½ºÅÒ µ¦ (DeckType = CustomÀÏ ¶§¸¸ »ç¿ë)")]
-        [Tooltip("Custom Å¸ÀÔÀÏ ¶§ »ç¿ëÇÒ Ä«µå ¸ñ·Ï")]
-        public List<CardDataSO> customCards = new();
+        [Header("Standard52 â€” ë¬´ëŠ¬ SO 4ê°œ")]
+        [Tooltip("ìŠ¤í˜ì´ë“œ SO")]
+        public SuitDataSO spade;
+        [Tooltip("í´ë¡œë²„ SO")]
+        public SuitDataSO club;
+        [Tooltip("í•˜íŠ¸ SO")]
+        public SuitDataSO heart;
+        [Tooltip("ë‹¤ì´ì•„ëª¬ë“œ SO")]
+        public SuitDataSO diamond;
+
+        [Header("ì—°ì‚°ì ì¹´ë“œ ëª©ë¡")]
+        public List<CardDataSO> operatorCards = new();
 
         /// <summary>
-        /// µ¦ Å¸ÀÔ¿¡ µû¶ó Ä«µå Queue¸¦ »ı¼ºÇÕ´Ï´Ù.
-        /// Standard52´Â 52ÀåÀ» ÀÚµ¿ »ı¼ºÇÏ°í,
-        /// CustomÀº Inspector ¸ñ·ÏÀ» ±×´ë·Î »ç¿ëÇÕ´Ï´Ù.
+        /// ì „ì²´ ì¹´ë“œ ëª©ë¡ì„ CardEntry ë¦¬ìŠ¤íŠ¸ë¡œ ë°˜í™˜í•©ë‹ˆë‹¤.
+        /// Standard52 : 4ë¬´ëŠ¬ Ã— 13ì¥ = 52ì¥
         /// </summary>
-        public List<CardDataSO> GetCards()
+        public List<CardEntry> GetAllCards()
         {
-            return deckType == DeckType.Standard52
-                ? GenerateStandard52()
-                : new List<CardDataSO>(customCards);
+            var result = new List<CardEntry>();
+
+            if (deckType == DeckType.Standard52)
+            {
+                AddSuit(result, spade, CardSuit.Spade);
+                AddSuit(result, club, CardSuit.Club);
+                AddSuit(result, heart, CardSuit.Heart);
+                AddSuit(result, diamond, CardSuit.Diamond);
+            }
+
+            return result;
         }
 
-        /// <summary>
-        /// Ç¥ÁØ ºí·¢Àè 52Àå µ¦À» »ı¼ºÇÕ´Ï´Ù.
-        /// ¼ıÀÚ Ä«µå¸¸ Æ÷ÇÔÇÕ´Ï´Ù (¿¬»êÀÚ Ä«µå´Â StageDataSO¿¡¼­ ÁÖÀÔ).
-        /// A=1, 2~10, J=11, Q=12, K=13 ¡¿ 4¹«´Ì
-        /// </summary>
-        private List<CardDataSO> GenerateStandard52()
+        private void AddSuit(List<CardEntry> result, SuitDataSO suitData, CardSuit suit)
         {
-            var cards = new List<CardDataSO>();
+            if (suitData == null) return;
 
-            for (int suit = 0; suit < 4; suit++)
+            // 1~13 ì¹´ë“œ ìƒì„±
+            for (int i = 1; i <= 13; i++)
             {
-                for (int value = 1; value <= 13; value++)
+                // ìˆ«ìì— ë§ëŠ” ê²Œì„ ë°ì´í„° SOê°€ ì—†ìœ¼ë¯€ë¡œ
+                // ëŸ°íƒ€ì„ì— CardDataSOë¥¼ ìƒì„±
+                var data = ScriptableObject.CreateInstance<CardDataSO>();
+                data.cardType = CardType.Number;
+                data.numberValue = i;
+                data.displayLabel = i switch
                 {
-                    // ·±Å¸ÀÓ Àü¿ë CardDataSO ÀÎ½ºÅÏ½º »ı¼º
-                    var card = CreateInstance<CardDataSO>();
-                    card.cardType = CardType.Number;
-                    card.numberValue = value;
-                    card.displayLabel = value switch
-                    {
-                        1 => "A",
-                        11 => "J",
-                        12 => "Q",
-                        13 => "K",
-                        _ => value.ToString()
-                    };
-                    cards.Add(card);
-                }
+                    1 => "A",
+                    11 => "J",
+                    12 => "Q",
+                    13 => "K",
+                    _ => i.ToString()
+                };
+
+                result.Add(new CardEntry
+                {
+                    data = data,
+                    suit = suit,
+                    suitData = suitData
+                });
             }
-            return cards;
+        }
+
+        [System.Serializable]
+        public class CardEntry
+        {
+            public CardDataSO data;
+            public CardSuit suit;
+            public SuitDataSO suitData; // â† ë¹„ì£¼ì–¼ ì°¸ì¡°
         }
     }
 }

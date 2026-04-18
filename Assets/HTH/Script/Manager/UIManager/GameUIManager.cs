@@ -5,172 +5,154 @@ using UnityEngine;
 namespace HTH
 {
     /// <summary>
-    /// 패널 전환과 이벤트 허브 역할만 담당합니다.
-    /// 모든 패널 로직은 각 패널 Manager에 위임합니다.
+    /// UI 중추 Manager.
+    /// FieldManager / HUDManager / VisionBettingManager /
+    /// CardCreateManager / GamePanelManager를 통합 제어합니다.
     /// </summary>
     public class GameUIManager : MonoBehaviour
     {
-        // ─── Inspector — 패널 루트 ───────────────────────────────
-        [Header("패널 루트")]
-        [SerializeField] private GameObject _titlePanel;
-        [SerializeField] private GameObject _bettingPanel;
-        [SerializeField] private GameObject _playerTurnPanel;
-        [SerializeField] private GameObject _dealerTurnPanel;
-        [SerializeField] private GameObject _resultPanel;
-        [SerializeField] private GameObject _gameOverPanel;
-
-        // ─── 패널 Manager ────────────────────────────────────────
-        [Header("패널 Manager")]
-        [SerializeField] private TitlePanelManager _titlePanelManager;
-        [SerializeField] private BettingPanelManager _bettingPanelManager;
-        [SerializeField] private GamePanelManager _gamePanelManager;
-        [SerializeField] private ResultPanelManager _resultPanelManager;
-        [SerializeField] private GameOverPanelManager _gameOverPanelManager;
-
-        // ─── 하위 UI Manager ─────────────────────────────────────
-        [Header("UI Manager")]
+        // ─── Inspector ───────────────────────────────────────────
+        [Header("하위 Manager")]
+        [SerializeField] private FieldManager _fieldManager;
         [SerializeField] private HUDManager _hudManager;
-        [SerializeField] private FieldUIManager _fieldUIManager;
-        [SerializeField] private HandUIManager _handUIManager;
+        [SerializeField] private VisionBettingManager _visionBettingManager;
         [SerializeField] private CardCreateManager _cardCreateManager;
-
-        // ─── 내부 상태 ───────────────────────────────────────────
-        private GameObject _activePanel;
+        [SerializeField] private GamePanelManager _gamePanelManager;
 
         // ─── 이벤트 허브 ─────────────────────────────────────────
-        /// <summary>연산자 슬롯 클릭 시 발행 — FieldUIManager에서 중계</summary>
+        /// <summary>연산자 슬롯 클릭 시 발행</summary>
         public event Action<int> OnOperatorSlotClicked;
 
-        /// <summary>손패 카드 클릭 시 발행 — HandUIManager에서 중계</summary>
+        /// <summary>손패 카드 클릭 시 발행</summary>
         public event Action<int> OnHandCardClicked;
 
         // ─── 생명주기 ─────────────────────────────────────────────
+
         private void Awake()
         {
-            _fieldUIManager.Initialize(_cardCreateManager);
-            _handUIManager.Initialize(_cardCreateManager);
-            _hudManager.Initialize(_fieldUIManager, _handUIManager);
+            _fieldManager.Initialize(_cardCreateManager);
 
-            _fieldUIManager.OnOperatorSlotClicked +=
+            _fieldManager.OnOperatorSlotClicked +=
                 idx => OnOperatorSlotClicked?.Invoke(idx);
-            _handUIManager.OnHandCardClicked +=
+            _fieldManager.OnHandCardClicked +=
                 idx => OnHandCardClicked?.Invoke(idx);
         }
 
-        // ─── 패널 전환 ───────────────────────────────────────────
+        // ─── HUD ─────────────────────────────────────────────────
 
-        /// <summary>지정 패널만 활성화하고 나머지를 비활성화합니다.</summary>
-        private void ShowOnly(GameObject target)
+        /// <summary>스테이지 정보를 갱신합니다.</summary>
+        public void SetStageInfo(int stageIndex, long bustValue)
+            => _hudManager.SetStageInfo(stageIndex, bustValue);
+
+        /// <summary>플레이어 현재 값을 갱신합니다.</summary>
+        public void UpdatePlayerValue(List<CardDataSO> field, StageDataSO stage)
+            => _hudManager.UpdatePlayerValue(field, stage);
+
+        /// <summary>딜러 Stay 후 값을 갱신합니다.</summary>
+        public void UpdateDealerValue(List<CardDataSO> field, StageDataSO stage)
+            => _hudManager.UpdateDealerValue(field, stage);
+
+        /// <summary>딜러 값 텍스트를 초기화합니다.</summary>
+        public void ClearDealerValue()
+            => _hudManager.ClearDealerValue();
+
+        // ─── 배팅 ────────────────────────────────────────────────
+
+        /// <summary>
+        /// 배팅 패널을 초기화하고 엽니다.
+        /// Confirm 시 FieldManager 활성화 후 onConfirm 호출합니다.
+        /// </summary>
+        public void SetupBetting(int betMin, int betMax, Action<int> onConfirm)
         {
-            if (_activePanel != null) _activePanel.SetActive(false);
-            _activePanel = target;
-            if (_activePanel != null) _activePanel.SetActive(true);
+            // 필드 초기화 및 숨김
+            _fieldManager.ClearAll();
+            _fieldManager.Hide();
+
+            // HUD 초기화
+            _hudManager.ClearDealerValue();
+
+            _visionBettingManager.Setup(betMin, betMax, betAmount =>
+            {
+                _fieldManager.Show();
+                onConfirm?.Invoke(betAmount);
+            });
+
+            // 배팅 패널 강제 오픈
+            _visionBettingManager.OpenPanel();
         }
 
-        /// <summary>모든 패널을 비활성화합니다.</summary>
-        public void HideAllPanels()
-        {
-            _titlePanel?.SetActive(false);
-            _bettingPanel?.SetActive(false);
-            _playerTurnPanel?.SetActive(false);
-            _dealerTurnPanel?.SetActive(false);
-            _resultPanel?.SetActive(false);
-            _gameOverPanel?.SetActive(false);
-            _activePanel = null;
-        }
+        // ─── 게임 버튼 ────────────────────────────────────────────
 
-        // ─── GameManager 호출 진입점 ─────────────────────────────
+        /// <summary>Hit / Stay 버튼 콜백을 등록합니다.</summary>
+        public void SetupGameButtons(Action onHit, Action onStand)
+            => _gamePanelManager.Setup(onHit, onStand);
 
-        /// <summary>타이틀 화면을 표시합니다.</summary>
-        public void ShowTitle(Action onStart)
-        {
-            ShowOnly(_titlePanel);
-            _titlePanelManager.Setup(onStart);
-        }
+        /// <summary>Hit / Stay 버튼을 활성화합니다.</summary>
+        public void EnableGameButtons()
+            => _gamePanelManager.EnableButtons();
 
-        /// <summary>배팅 화면을 표시합니다.</summary>
-        public void ShowBetting(int currentBet, Action<int> onConfirm)
-        {
-            ShowOnly(_bettingPanel);
-            _bettingPanelManager.Setup(currentBet, onConfirm);
-        }
-
-        /// <summary>플레이어 턴 화면을 표시합니다.</summary>
-        public void ShowPlayerTurn(
-            List<CardDataSO> field,
-            List<CardDataSO> hand,
-            Action onHit,
-            Action onStand)
-        {
-            ShowOnly(_playerTurnPanel);
-            RefreshPlayerArea(field, hand);
-            _gamePanelManager.Setup(onHit, onStand);
-        }
-
-        /// <summary>딜러 대기 화면을 표시합니다.</summary>
-        public void ShowDealerThinking() => ShowOnly(_dealerTurnPanel);
-
-        /// <summary>결과 화면을 표시합니다.</summary>
-        public void ShowResult(string description, bool win, Action onNext)
-        {
-            ShowOnly(_resultPanel);
-            _resultPanelManager.Setup(description, win, onNext);
-        }
-
-        /// <summary>게임 오버 화면을 표시합니다.</summary>
-        public void ShowGameOver(Action onRestart)
-        {
-            ShowOnly(_gameOverPanel);
-            _gameOverPanelManager.SetupGameOver(onRestart);
-        }
-
-        /// <summary>스테이지 클리어 화면을 표시합니다.</summary>
-        public void ShowStageClear(Action onRestart)
-        {
-            ShowOnly(_gameOverPanel);
-            _gameOverPanelManager.SetupStageClear(onRestart);
-        }
-
-        // ─── HUDManager 위임 ──────────────────────────────────────
-
-        public void SetBetPanelInfo(int stageIndex, long quota)
-            => _hudManager.SetBetPanelInfo(stageIndex, quota);
-
-        public void SetGamePanelInfo(int stageIndex, long quota)
-            => _hudManager.SetGamePanelInfo(stageIndex, quota);
-
-        public void UpdateCurrentValue(List<CardDataSO> field, long quota = 0, bool flexibleAce = false,
-            long bustThreshold = 21, bool currentValueSet = true)
-            => _hudManager.UpdateCurrentValue(field, quota, flexibleAce, bustThreshold, currentValueSet);
-
-        public void SetResultInfo(long finalValue, long quota, bool win)
-            => _resultPanelManager.SetCompareInfo(finalValue, quota, win);
-
-        // ─── FieldUIManager / HandUIManager 위임 ─────────────────
-
-        public void RefreshPlayerArea(List<CardDataSO> field, List<CardDataSO> hand)
-        {
-            _fieldUIManager.RefreshField(field);
-            _handUIManager.RefreshHand(hand);
-        }
-
-        public void RefreshDealerArea(List<CardDataSO> field, bool hasHiddenCard = false)
-            => _fieldUIManager.RefreshDealerField(field, hasHiddenCard);
-
-        public void PlaceOperatorOnSlot(int slotIndex, OperatorType op)
-            => _fieldUIManager.PlaceOperatorOnSlot(slotIndex, op);
-
-        public void HighlightAvailableSlots(bool highlight)
-            => _fieldUIManager.HighlightAvailableSlots(highlight);
-
-        public void HighlightHandCard(int index)
-            => _handUIManager.HighlightHandCard(index);
-
-        public void RemoveFromHand(int index)
-            => _handUIManager.RemoveFromHand(index);
-
-        /// <summary>게임 패널 버튼을 비활성화합니다.</summary>
+        /// <summary>Hit / Stay 버튼을 비활성화합니다.</summary>
         public void DisableGameButtons()
             => _gamePanelManager.DisableButtons();
+
+        // ─── Result / GameOver ────────────────────────────────────
+
+        /// <summary>Result 패널을 표시합니다.</summary>
+        public void ShowResult(
+            string description,
+            bool win,
+            long playerTotal,
+            long dealerTotal,
+            long bustValue,
+            Action onNext)
+        {
+            _gamePanelManager.ShowResult(description, win, onNext);
+            _gamePanelManager.SetResultCompare(
+                playerTotal, dealerTotal, bustValue, win);
+        }
+
+        /// <summary>게임 오버 패널을 표시합니다.</summary>
+        public void ShowGameOver(Action onRestart)
+            => _gamePanelManager.ShowGameOver(onRestart);
+
+        /// <summary>스테이지 클리어 패널을 표시합니다.</summary>
+        public void ShowStageClear(Action onRestart)
+            => _gamePanelManager.ShowStageClear(onRestart);
+
+        // ─── 필드 — Add 방식 ─────────────────────────────────────
+
+        /// <summary>플레이어 필드에 카드 1장을 추가합니다.</summary>
+        public void AddPlayerFieldCard(DeckSO.CardEntry entry)
+            => _fieldManager.AddPlayerFieldCard(entry);
+
+        /// <summary>딜러 필드에 카드 1장을 추가합니다.</summary>
+        public void AddDealerFieldCard(DeckSO.CardEntry entry, bool isHidden = false)
+            => _fieldManager.AddDealerFieldCard(entry, isHidden);
+
+        /// <summary>손패에 카드 1장을 추가합니다.</summary>
+        public void AddHandCard(DeckSO.CardEntry entry)
+            => _fieldManager.AddHandCard(entry);
+
+        /// <summary>전체 필드를 초기화합니다. 라운드 시작 시 호출합니다.</summary>
+        public void ClearAllFields()
+            => _fieldManager.ClearAll();
+
+        // ─── 슬롯 / 하이라이트 ───────────────────────────────────
+
+        /// <summary>연산자 슬롯에 연산자를 배치합니다.</summary>
+        public void PlaceOperatorOnSlot(int slotIndex, OperatorType op)
+            => _fieldManager.PlaceOperatorOnSlot(slotIndex, op);
+
+        /// <summary>슬롯 하이라이트를 갱신합니다.</summary>
+        public void HighlightAvailableSlots(bool highlight)
+            => _fieldManager.HighlightAvailableSlots(highlight);
+
+        /// <summary>손패 카드 선택 상태를 갱신합니다.</summary>
+        public void HighlightHandCard(int index)
+            => _fieldManager.HighlightHandCard(index);
+
+        /// <summary>딜러 비공개 카드를 앞면으로 뒤집습니다.</summary>
+        public void RevealDealerHiddenCard()
+            => _fieldManager.RevealDealerHiddenCard();
     }
 }

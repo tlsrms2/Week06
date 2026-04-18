@@ -1,43 +1,57 @@
 ﻿namespace HTH
 {
     /// <summary>
-    /// 표준 블랙잭 딜러 AI.
-    /// BustThreshold는 스테이지마다 GameManager가 주입합니다.
-    /// Stage 1 : 21 / Stage 2+ : quota값
+    /// 블랙잭 딜러 AI.
+    ///
+    /// 1단계 : bustValue의 80% 미만이면 히트
+    /// 2단계 : 사칙연산 스테이지에서도 동일 기준 적용
+    ///   - bustValue가 달라도 80% 미만이면 히트
+    ///   - 연산자 배치는 DealerManager가 담당
     /// </summary>
     public class DealerAI : IDealerStrategy
     {
         private long _bustThreshold = 21;
-
         public long BustThreshold => _bustThreshold;
 
-        /// <summary>딜러 버스트 기준값을 설정합니다. GameManager가 스테이지 진입 시 호출합니다.</summary>
-        public void SetBustThreshold(long threshold) => _bustThreshold = threshold;
+        public void SetBustThreshold(long threshold)
+            => _bustThreshold = threshold;
 
         /// <summary>
         /// 딜러 히트 여부를 판단합니다.
-        /// currentValueSet = true  : 임계값의 60% 미만이면 히트 (높게 쌓아야 함)
-        /// currentValueSet = false : 임계값의 140% 초과면 히트 (낮게 내려야 함)
-        /// StageDataSO 없는 경우 기본 블랙잭 룰 (17 미만 히트) 적용
+        /// bustValue의 80% 미만이면 히트합니다.
+        /// bustValue 초과 시 이미 버스트이므로 히트 불필요.
+        ///
+        /// bustValue = 21 → 16 미만이면 히트
+        /// bustValue = 50 → 40 미만이면 히트
+        /// bustValue = 10 → 8  미만이면 히트
         /// </summary>
         public bool ShouldHit(long currentTotal, StageDataSO stage = null)
         {
-            if (stage == null || stage.stageIndex == 1)
-                return currentTotal < 17;
+            long bustValue = stage?.bustValue ?? _bustThreshold;
 
-            if (stage.currentValueSet)
-                // 높아야 함 → bustValue의 80% 미만이면 더 드로우
-                return currentTotal < stage.bustValue * 0.8f;
+            if (stage == null)
+                return currentTotal < (long)(bustValue * 0.8f);
+
+            if (stage.normalJudge)
+            {
+                // 기본 — 버스트면 히트 불필요
+                if (currentTotal > bustValue) return false;
+                return currentTotal < (long)(bustValue * 0.8f);
+            }
             else
-                // 낮아야 함 → bustValue의 60% 초과면 더 드로우 (낮추려고 뺄셈/나눗셈 사용)
-                return currentTotal > stage.bustValue * 0.6f;
+            {
+                // 리버스 — 버스트면 히트 불필요
+                if (currentTotal < bustValue) return false;
+                // bustValue의 120% 초과면 히트 (값을 낮춰야 하므로)
+                return currentTotal > (long)(bustValue * 1.2f);
+            }
         }
 
-        /// <summary>승패 결과 설명 문자열을 반환합니다.</summary>
-        public string GetResultDescription(long dealerTotal, long playerTotal, long quota)
+        public string GetResultDescription(
+            long dealerTotal, long playerTotal, long quota)
         {
             if (playerTotal > quota) return "버스트 — 할당량 초과";
-            if (dealerTotal > _bustThreshold) return "딜러 버스트 — 플레이어 승리";
+            if (dealerTotal > quota) return "딜러 버스트 — 플레이어 승리";
             if (playerTotal > dealerTotal) return "플레이어 승리";
             if (playerTotal < dealerTotal) return "딜러 승리";
             return "무승부";

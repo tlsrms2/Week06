@@ -1,136 +1,76 @@
 ﻿using System.Collections.Generic;
-using System.Text;
 
 namespace HTH
 {
-    /// <summary>
-    /// 좌→우 순차 연산 평가기.
-    /// 수학적 우선순위를 무시하고 배치 순서대로만 계산합니다.
-    /// Ace(1)는 useFlexibleAce = true일 때 1 또는 11로 자동 선택됩니다.
-    /// 예: [10][×][5][+][3] = 53
-    /// </summary>
     public static class ExpressionEvaluator
     {
         /// <summary>
-        /// CardDataSO 리스트를 좌→우로 순차 연산합니다.
-        /// useFlexibleAce = true면 Ace를 버스트 없이 최대값이 되도록 자동 선택합니다.
+        /// 카드 리스트를 연산합니다.
+        ///
+        /// 규칙
+        /// 1. 연산자는 바로 앞 숫자와 뒤 숫자 사이에만 적용
+        /// 2. 연산자가 없는 숫자 사이는 기본 덧셈
+        /// 3. 비덧셈 연산자가 연속될 경우 오른쪽부터 묶음 (선입 조건)
+        ///
+        /// 예: 2 + A + J × 3 + 9
+        ///   = 2 + 1 + (10 × 3) + 9 = 42
+        ///
+        /// 예: 2 + A − J ÷ 3 + 9
+        ///   = 2 + (1 − (10 ÷ 3)) + 9
+        ///   = 2 + (1 − 3) + 9
+        ///   = 2 + (-2) + 9 = 9
         /// </summary>
-        public static long Evaluate(List<CardDataSO> expression, bool useFlexibleAce = false, long bustThreshold = 21)
+        public static long Evaluate(List<CardDataSO> expression, bool useFlexibleAce = false, long bustThreshold = 21, bool allowNegative = false)
         {
             if (expression == null || expression.Count == 0) return 0;
 
-            SplitExpression(expression, out List<int> numbers, out List<OperatorType> operators);
+            SplitExpression(expression, out List<long> numbers, out List<OperatorType> operators);
 
-            return useFlexibleAce
+            long result = useFlexibleAce
                 ? EvaluateWithFlexibleAce(numbers, operators, bustThreshold)
-                : EvaluateSplit(numbers, operators);
+                : EvaluateInfix(numbers, operators);
+
+            // 음수 제한
+            if (!allowNegative && result < 0)
+                result = 0;
+
+            return result;
         }
 
-        /// <summary>
-        /// 현재 필드를 수식 문자열로 반환합니다.
-        /// 예: "A + 7 + 3"
-        /// </summary>
+        /// <summary>수식 문자열을 반환합니다.</summary>
         public static string ToExpressionString(List<CardDataSO> expression)
         {
             if (expression == null || expression.Count == 0) return "—";
 
-            var sb = new StringBuilder();
-            bool needsOperator = false;
-
+            var sb = new System.Text.StringBuilder();
             foreach (var card in expression)
             {
                 if (card.cardType == CardType.Number)
-                {
-                    if (needsOperator) sb.Append(" + ");
-                    sb.Append(string.IsNullOrEmpty(card.displayLabel)
-                        ? card.numberValue.ToString()
+                    sb.Append(string.IsNullOrEmpty(card.displayLabel) ? card.BlackjackValue.ToString()
                         : card.displayLabel);
-                    needsOperator = true;
-                }
                 else
-                {
-                    if (needsOperator)
-                    {
-                        sb.Append(" ");
-                        sb.Append(card.displayLabel);
-                        sb.Append(" ");
-                        needsOperator = false;
-                    }
-                }
+                    sb.Append($" {card.displayLabel} ");
             }
-            return sb.ToString();
+            return sb.ToString().Trim();
         }
 
         // ─── private ─────────────────────────────────────────────
 
-        /// <summary>
-        /// Ace를 유연하게 처리하는 연산.
-        /// 모든 Ace를 1로 먼저 계산한 뒤,
-        /// Ace를 11로 바꿔도 bustThreshold를 초과하지 않으면 11로 적용합니다.
-        /// 여러 Ace가 있을 경우 각각 독립적으로 판단합니다.
-        /// </summary>
-        private static long EvaluateWithFlexibleAce(List<int> numbers, List<OperatorType> operators, long bustThreshold)
+        private static void SplitExpression(List<CardDataSO> expression, out List<long> numbers, out List<OperatorType> operators)
         {
-            // 1단계: 모든 Ace를 1로 계산
-            long baseResult = EvaluateSplit(numbers, operators);
-
-            // 2단계: Ace를 11로 바꿀 수 있는지 확인
-            // Ace(1)를 11로 바꾸면 +10 효과
-            // 단, 덧셈 슬롯에 있는 Ace만 유연 적용 가능
-            // (곱셈/나눗셈 슬롯의 Ace는 의미가 달라 고정값 사용)
-            for (int i = 0; i < numbers.Count; i++)
-            {
-                if (numbers[i] != 1) continue; // Ace가 아니면 스킵
-
-                // i번째 숫자의 연산자 확인
-                // i == 0 이면 첫 번째 숫자 (기본 덧셈)
-                OperatorType op = i == 0
-                    ? OperatorType.None
-                    : (i - 1 < operators.Count ? operators[i - 1] : OperatorType.None);
-
-                // 덧셈(None) 슬롯의 Ace만 유연 처리
-                if (op != OperatorType.None) continue;
-
-                // 11로 바꿨을 때 버스트하지 않으면 적용
-                if (baseResult + 10 <= bustThreshold)
-                    baseResult += 10;
-            }
-
-            return baseResult;
-        }
-
-        /// <summary>분리된 숫자/연산자를 좌→우로 계산합니다.</summary>
-        private static long EvaluateSplit(List<int> numbers,List<OperatorType> operators)
-        {
-            if (numbers.Count == 0) return 0;
-
-            long result = numbers[0];
-            for (int i = 1; i < numbers.Count; i++)
-            {
-                OperatorType op = i - 1 < operators.Count
-                    ? operators[i - 1]
-                    : OperatorType.None;
-                result = ApplyOperator(result, op, numbers[i]);
-            }
-            return result;
-        }
-
-        /// <summary>CardDataSO 리스트를 숫자/연산자 리스트로 분리합니다.</summary>
-        private static void SplitExpression(List<CardDataSO> expression, out List<int> numbers, out List<OperatorType> operators)
-        {
-            numbers = new List<int>();
+            numbers = new List<long>();
             operators = new List<OperatorType>();
 
-            var pendingOp = OperatorType.None;
+            OperatorType pendingOp = OperatorType.None;
 
             foreach (var card in expression)
             {
                 if (card.cardType == CardType.Number)
                 {
-                    //J/Q/K는 10으로 처리
-                    numbers.Add(card.BlackjackValue);
+                    if (numbers.Count > 0)
+                        operators.Add(pendingOp);
 
-                    if (numbers.Count > 1) operators.Add(pendingOp);
+                    numbers.Add(card.BlackjackValue);
                     pendingOp = OperatorType.None;
                 }
                 else
@@ -140,7 +80,100 @@ namespace HTH
             }
         }
 
-        /// <summary>left op right를 계산합니다. 0 나누기 방어 포함.</summary>
+        /// <summary>
+        /// 비덧셈 연산자를 오른쪽부터 묶어서 처리한 뒤
+        /// 나머지를 덧셈으로 합산합니다.
+        ///
+        /// 처리 순서
+        /// 1. 오른쪽부터 순회하며 비덧셈 연산자 연속 구간을 찾음
+        /// 2. 연속 구간 내에서 오른쪽부터 묶어서 계산
+        /// 3. 단일 값으로 축약 후 덧셈으로 합산
+        /// </summary>
+        private static long EvaluateInfix(List<long> numbers, List<OperatorType> operators)
+        {
+            var nums = new List<long>(numbers);
+            var ops = new List<OperatorType>(operators);
+
+            // 오른쪽부터 순회하며 비덧셈 연산자 처리
+            int i = ops.Count - 1;
+            while (i >= 0)
+            {
+                if (IsNonAdditive(ops[i]))
+                {
+                    // 연속된 비덧셈 구간의 시작을 찾음
+                    int start = i;
+                    while (start > 0 && IsNonAdditive(ops[start - 1]))
+                        start--;
+
+                    // 오른쪽부터 묶어서 계산
+                    // 예: A − B ÷ C → A − (B ÷ C)
+                    //     start=0, i=1 이면
+                    //     먼저 B ÷ C 계산 후 A − 결과
+                    int j = i;
+                    while (j >= start)
+                    {
+                        long left = nums[j];
+                        long right = nums[j + 1];
+                        long val = ApplyOperator(left, ops[j], right);
+
+                        UnityEngine.Debug.Log(
+                            $"[Evaluator] {left} {ops[j]} {right} = {val}");
+
+                        nums.RemoveAt(j + 1);
+                        nums[j] = val;
+                        ops.RemoveAt(j);
+                        j--;
+                    }
+
+                    i = start - 1;
+                }
+                else
+                {
+                    i--;
+                }
+            }
+
+            // 남은 숫자 덧셈 합산
+            long result = 0;
+            foreach (var n in nums) result += n;
+
+            UnityEngine.Debug.Log(
+                $"[Evaluator] 최종합산 [{string.Join("+", nums)}] = {result}");
+
+            return result;
+        }
+
+        /// <summary>FlexibleAce 적용 버전.</summary>
+        private static long EvaluateWithFlexibleAce(List<long> numbers, List<OperatorType> operators, long bustThreshold)
+        {
+            long baseResult = EvaluateInfix(numbers, operators);
+
+            for (int i = 0; i < numbers.Count; i++)
+            {
+                if (numbers[i] != 1) continue;
+
+                OperatorType op = i == 0
+                    ? OperatorType.None
+                    : (i - 1 < operators.Count
+                        ? operators[i - 1]
+                        : OperatorType.None);
+
+                if (op != OperatorType.None) continue;
+
+                if (baseResult + 10 <= bustThreshold)
+                    baseResult += 10;
+            }
+
+            return baseResult;
+        }
+
+        /// <summary>비덧셈 연산자 여부를 확인합니다.</summary>
+        private static bool IsNonAdditive(OperatorType op)
+            => op == OperatorType.Subtract
+            || op == OperatorType.Multiply
+            || op == OperatorType.Divide;
+
+        /// <summary>left op right를 계산합니다.</summary>
         private static long ApplyOperator(long left, OperatorType op, long right)
         {
             return op switch

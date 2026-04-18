@@ -40,9 +40,6 @@ CommandLineArgsForDesignTimeEvaluation=-langversion:9.0 -define:UNITY_6000_3_9;U
 /warnaserror+:NU1605
 
 [sourceFiles]
-Assets/Animations/Anim/
- AnimationTriggerController.cs
- DealerSequenceController.cs
 Assets/HTH/Script/Card/
  Card3DView.cs
  ICardView.cs
@@ -78,11 +75,14 @@ Assets/HTH/Script/
  Rule/
   ExpressionEvaluator.cs
   OperatorSlot3D.cs
+Assets/JSG/Anim/
+ AnimationTriggerController.cs
+ DealerSequenceController.cs
 Assets/KSJ/
  CardDealManager.cs
  CardFlip.cs
  VignetteTest.cs
-Assets/Package_AlchemistHouse/Scripts/
+Assets/Package/Package_AlchemistHouse/Scripts/
  FreeCamera.cs
  VolumetricLight.cs
  VolumetricLightRenderer.cs

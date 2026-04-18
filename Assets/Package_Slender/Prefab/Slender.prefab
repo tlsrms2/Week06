@@ -1173,6 +1173,7 @@ GameObject:
   - component: {fileID: 1010010733671478586}
   - component: {fileID: 6957573965259036736}
   - component: {fileID: 196916133326810966}
+  - component: {fileID: 87855406006800065}
   m_Layer: 0
   m_Name: Slender
   m_TagString: Untagged
@@ -1232,12 +1233,55 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AnimationTriggerController
   targetPositions:
-  - {x: 0.682, y: 1.35, z: 0}
-  - {x: 0.752, y: 1.021, z: 0}
+  - {x: 0.532, y: 1.35, z: 0.003}
   - {x: 0.292, y: 1.467, z: 0}
-  - {x: 1.069, y: 0.851, z: 0}
   - {x: 0.292, y: 1.224, z: 0}
+  - {x: 1.069, y: 0.851, z: 0}
+  - {x: 1.049, y: 0.947, z: -0.077}
   - {x: 0.316, y: 0.955, z: 0.183}
+--- !u!114 &87855406006800065
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4061999138098054953}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6856edaec8da9949b32d986d1591cb5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DealerSequenceController
+  animator: {fileID: 6957573965259036736}
+  deckTransform: {fileID: 0}
+  deckRestPoint: {fileID: 0}
+  rightHandAnchor: {fileID: 4319079523538621421}
+  cardSpawnPoint: {fileID: 0}
+  cardVisualPrefab: {fileID: 0}
+  playerCardPoints: []
+  dealerCardPoints: []
+  idleTrigger: Idle
+  drawTrigger: Draw
+  drawClip: {fileID: 0}
+  cardsPerSide: 2
+  pickupAttachDelay: 0.2
+  delayBeforeFirstDeal: 0.15
+  delayBetweenDeals: 0.45
+  putDownDetachDelay: 2.4
+  cardMoveDuration: 0.2
+  playOnStart: 0
+  testKey: 32
+  onSequenceStarted:
+    m_PersistentCalls:
+      m_Calls: []
+  onPlayerCardDealt:
+    m_PersistentCalls:
+      m_Calls: []
+  onDealerCardDealt:
+    m_PersistentCalls:
+      m_Calls: []
+  onSequenceCompleted:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &4162965382049386049
 GameObject:
   m_ObjectHideFlags: 0

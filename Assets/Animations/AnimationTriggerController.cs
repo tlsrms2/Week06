@@ -20,27 +20,27 @@ public class AnimationTriggerController : MonoBehaviour
         // 키보드 상단의 숫자 1~6 입력 감지
         if (Input.GetKeyDown(KeyCode.Alpha1))
         {
-            PlayAnimationAndMove(0, "Anim1", 1);
+            PlayAnimationAndMove(0, "Idle", 1);
         }
         else if (Input.GetKeyDown(KeyCode.Alpha2))
         {
-            PlayAnimationAndMove(1, "Anim2", 2);
+            PlayAnimationAndMove(1, "Draw", 2);
         }
         else if (Input.GetKeyDown(KeyCode.Alpha3))
         {
-            PlayAnimationAndMove(2, "Anim3", 3);
+            PlayAnimationAndMove(2, "DrawOneCard", 3);
         }
         else if (Input.GetKeyDown(KeyCode.Alpha4))
         {
-            PlayAnimationAndMove(3, "Anim4", 4);
+            PlayAnimationAndMove(3, "Emotion1", 4);
         }
         else if (Input.GetKeyDown(KeyCode.Alpha5))
         {
-            PlayAnimationAndMove(4, "Anim5", 5);
+            PlayAnimationAndMove(4, "Emotion2", 5);
         }
         else if (Input.GetKeyDown(KeyCode.Alpha6))
         {
-            PlayAnimationAndMove(5, "Anim6", 6);
+            PlayAnimationAndMove(5, "Emotion3", 6);
         }
     }
 

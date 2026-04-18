@@ -262,8 +262,7 @@ namespace HTH
                 }
 
                 // 경계 슬롯 제외한 너비 계산
-                float rowWidth = rowCardCount * _cardSpacingX
-                               + rowSlotCount * _slotWidth;
+                float rowWidth = (rowCardCount - 1) * _cardSpacingX + rowSlotCount * _slotWidth;
                 float curX = -rowWidth / 2f;
                 float curY = -row * _cardSpacingY;
 
@@ -288,9 +287,19 @@ namespace HTH
 
                     if (isBoundary)
                     {
-                        // 경계 슬롯 비활성화
-                        if (slot != null) slot.gameObject.SetActive(false);
-                        if (opObj != null) opObj.SetActive(false);
+                        // ← SetActive(false) 제거
+                        // 줄 1 마지막 카드 오른쪽에 배치
+                        if (slot != null)
+                        {
+                            slot.gameObject.SetActive(true);
+                            slot.transform.localPosition = new Vector3(curX, curY, 0f);
+                        }
+                        else if (opObj != null)
+                        {
+                            opObj.SetActive(true);
+                            opObj.transform.localPosition = new Vector3(curX, curY, 0f);
+                        }
+                        // curX는 너비 계산에 포함 안 됐으므로 갱신 불필요
                         slotIdx++;
                     }
                     else if (!isLastInRow)

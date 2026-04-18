@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace HTH
@@ -53,6 +54,9 @@ namespace HTH
         private readonly List<DeckSO.CardEntry> _pendingOperators = new();
 
         // ─── 연출 지연 시간 ───────────────────────────────────────
+        [Header("초기 딜링 지연 시간")]
+        [Tooltip("초기 딜링 카드 사이 대기 시간 (초)")]
+        [SerializeField] private float _dealInterval = 0.5f;
         [Header("연출 지연 시간")]
         [SerializeField] private float _bustDelay = 1.5f;
         [SerializeField] private float _standDelay = 1.0f;
@@ -78,6 +82,7 @@ namespace HTH
             _playerHandManager.OnHandChanged += OnPlayerHandChanged;
             _playerHandManager.OnHandSelectionChanged += OnHandSelectionChanged;
             _playerHandManager.OnSlotHighlightRequested += OnSlotHighlightRequested;
+
             _dealerManager.OnDealerCardAdded += OnDealerCardAdded;
             _dealerManager.OnDealerTurnEnded += OnDealerTurnEnded;
             _dealerManager.OnDealerCardRevealed += OnDealerCardRevealed;
@@ -92,6 +97,7 @@ namespace HTH
             _playerHandManager.OnHandChanged -= OnPlayerHandChanged;
             _playerHandManager.OnHandSelectionChanged -= OnHandSelectionChanged;
             _playerHandManager.OnSlotHighlightRequested -= OnSlotHighlightRequested;
+
             _dealerManager.OnDealerCardAdded -= OnDealerCardAdded;
             _dealerManager.OnDealerTurnEnded -= OnDealerTurnEnded;
             _dealerManager.OnDealerCardRevealed -= OnDealerCardRevealed;
@@ -175,10 +181,8 @@ namespace HTH
                 case GameState.Title: OnEnterTitle(); break;
                 case GameState.Betting: OnEnterBetting(); break;
                 case GameState.PlayerTurn: OnEnterPlayerTurn(); break;
-                case GameState.DealerTurn:
-                    StartCoroutine(_dealerManager.RunTurn(
-                        _deckRunner, _dealerStrategy,
-                        _stageManager.CurrentStage)); break;
+                case GameState.DealerTurn: StartCoroutine(_dealerManager.RunTurn(
+                        _deckRunner, _dealerStrategy, _stageManager.CurrentStage)); break;
                 case GameState.Result: OnEnterResult(); break;
                 case GameState.GameOver: OnEnterGameOver(); break;
                 case GameState.StageClear: OnEnterStageClear(); break;
@@ -209,14 +213,14 @@ namespace HTH
             if (_dealerStrategy is DealerAI ai)
                 ai.SetBustThreshold(_stageManager.CurrentStage.bustValue);
 
-            _gameUI?.EnableGameButtons();
+            _gameUI?.DisableGameButtons();
             _gameUI?.ClearDealerValue();
 
-            // ← 변경 — Refresh 대신 ClearAllFields 후 초기 딜링
+            // Refresh 대신 ClearAllFields 후 초기 딜링
             // 초기 딜링에서 AddPlayerFieldCard / AddDealerFieldCard가 호출됨
             _gameUI?.ClearAllFields();
 
-            DealInitialCards();
+            StartCoroutine(DealInitialAndEnable());
 
             if (_gameUI != null)
             {
@@ -226,40 +230,68 @@ namespace HTH
 
             UI_ShowPlayerTurn();
         }
+        private IEnumerator DealInitialAndEnable()
+        {
+            yield return StartCoroutine(DealInitialCardsRoutine());
+            _gameUI?.EnableGameButtons();
+        }
 
         // ─── 초기 딜링 ────────────────────────────────────────────
-
-        private void DealInitialCards()
+        /// <summary>
+        /// 초기 딜링을 순차적으로 수행합니다.
+        /// 플레이어 1장 → 딜러 1장(공개) → 플레이어 1장 → 딜러 1장(비공개)
+        /// 각 카드 사이에 _dealInterval만큼 대기합니다.
+        /// </summary>
+        private IEnumerator DealInitialCardsRoutine()
         {
-            if (_stageManager.CurrentStage.operatorOnlyHit)
-            {
-                DealAllNumberCards();
-                return;
+            if(_stageManager.CurrentStage.operatorOnlyHit)
+    {
+                yield return StartCoroutine(DealAllNumberCardsRoutine());
+                yield break;
             }
 
+            // 1. 플레이어 첫 번째 카드
             if (_deckRunner.TryDraw(out DeckSO.CardEntry p1))
                 _playerHandManager.AddNumberToField(p1);
 
+            yield return new WaitForSeconds(_dealInterval);
+
+            // 2. 딜러 공개 카드
             if (_deckRunner.TryDraw(out DeckSO.CardEntry d1))
                 _dealerManager.AddOpenCard(d1);
 
+            yield return new WaitForSeconds(_dealInterval);
+
+            // 3. 플레이어 두 번째 카드
             if (_deckRunner.TryDraw(out DeckSO.CardEntry p2))
                 _playerHandManager.AddNumberToField(p2);
 
+            yield return new WaitForSeconds(_dealInterval);
+
+            // 4. 딜러 비공개 카드
             if (_deckRunner.TryDraw(out DeckSO.CardEntry d2))
                 _dealerManager.SetHiddenCard(d2);
         }
 
-        private void DealAllNumberCards()
+        /// <summary>
+        /// operatorOnlyHit 스테이지 전용 초기 딜링.
+        /// 숫자 카드를 하나씩 순차적으로 지급합니다.
+        /// </summary>
+        private IEnumerator DealAllNumberCardsRoutine()
         {
             while (_deckRunner.Remaining > 0)
             {
                 if (!_deckRunner.TryDraw(out DeckSO.CardEntry entry)) break;
 
                 if (entry.data.cardType == CardType.Number)
+                {
                     _playerHandManager.AddNumberToField(entry);
+                    yield return new WaitForSeconds(_dealInterval);
+                }
                 else
+                {
                     _pendingOperators.Add(entry);
+                }
             }
 
             foreach (var op in _pendingOperators)
@@ -364,21 +396,54 @@ namespace HTH
 
                 _hitCount++;
 
-                // OnFieldChanged 이벤트 일시 차단
                 _playerHandManager.OnFieldChanged -= OnPlayerFieldChanged;
                 _playerHandManager.AddNumberToField(entry);
 
-                _gameUI?.AddPlayerFieldCard(entry);
+                // 연산자 카드 확률 판정
+                if (stage.useOperatorCards &&
+                    stage.operatorCardRatio > 0f &&
+                    Random.value < stage.operatorCardRatio)
+                {
+                    var opCards = stage.deck.operatorCards;
+                    if (opCards != null && opCards.Count > 0)
+                    {
+                        var opData = opCards[Random.Range(0, opCards.Count)];
+                        var opEntry = new DeckSO.CardEntry
+                        {
+                            data = opData,
+                            suit = CardSuit.Spade,
+                            suitData = null
+                        };
+
+                        Debug.Log($"[GM] 연산자 카드 추가 — {opData.displayLabel} " +
+                                  $"(확률:{stage.operatorCardRatio:P0})");
+
+                        _gameUI?.DisableGameButtons();
+                        _playerHandManager.AddOperatorToHand(opEntry);
+
+                        _gameUI?.ShowOperatorChoice(
+                            onDiscard: () =>
+                            {
+                                _playerHandManager.DiscardLastOperator();
+                                _gameUI?.RemoveHandCard();
+                                _gameUI?.EnableGameButtons();
+                            });
+
+                        // ← 재구독 후 UI 갱신하고 흐름 중단
+                        _playerHandManager.OnFieldChanged += OnPlayerFieldChanged;
+                        _gameUI?.AddPlayerFieldCard(entry, createSlot: stage.useOperatorCards);
+                        _gameUI?.UpdatePlayerValue(_playerHandManager.FieldData, stage);
+                        return;
+                    }
+                }
+
+                // 연산자 카드 없을 때 — 기존 흐름 계속
+                _gameUI?.AddPlayerFieldCard(entry, createSlot: stage.useOperatorCards);
 
                 bool bust = _blackjackManager.IsPlayerBust(_playerHandManager.FieldData, stage);
 
-                Debug.Log($"[GM] Hit — " +
-                          $"total:{_blackjackManager.EvaluatePlayer(_playerHandManager.FieldData, stage)} " +
-                          $"bust:{bust}");
-
                 if (bust)
                 {
-                    // 버스트 — HUD 값 갱신 후 Result 전환
                     _gameUI?.UpdatePlayerValue(_playerHandManager.FieldData, stage);
                     _playerHandManager.OnFieldChanged += OnPlayerFieldChanged;
                     ExitPlayerTurn();
@@ -430,7 +495,15 @@ namespace HTH
         private void OnOperatorSlotSelected(int slotIndex)
         {
             if (_playerHandManager.TryPlaceOperator(slotIndex, out DeckSO.CardEntry placed))
+            {
                 _gameUI?.PlaceOperatorOnSlot(slotIndex, placed.data.operatorType);
+                //_gameUI?.RemoveHandCard();
+                _gameUI?.HideOperatorChoice();
+                _gameUI?.EnableGameButtons();
+
+                // ← 연산자 배치 후 값 갱신
+                _gameUI?.UpdatePlayerValue(_playerHandManager.FieldData, _stageManager.CurrentStage);
+            }
         }
 
         private System.Collections.IEnumerator DelayedTransition(
@@ -450,10 +523,22 @@ namespace HTH
         {
             if (_playerHandManager.Field.Count == 0) return;
 
-            // 마지막으로 추가된 카드만 UI에 추가
             var last = _playerHandManager.Field[_playerHandManager.Field.Count - 1];
-            _gameUI?.AddPlayerFieldCard(last);
-            _gameUI?.UpdatePlayerValue(_playerHandManager.FieldData, _stageManager.CurrentStage);
+
+            // ← 연산자 카드면 AddPlayerFieldCard 스킵
+            if (last.data.cardType == CardType.Operator)
+            {
+                _gameUI?.UpdatePlayerValue(
+                    _playerHandManager.FieldData,
+                    _stageManager.CurrentStage);
+                return;
+            }
+
+            _gameUI?.AddPlayerFieldCard(last,
+                createSlot: _stageManager.CurrentStage.useOperatorCards);
+            _gameUI?.UpdatePlayerValue(
+                _playerHandManager.FieldData,
+                _stageManager.CurrentStage);
         }
 
         /// <summary>
@@ -477,9 +562,9 @@ namespace HTH
             _gameUI?.AddDealerFieldCard(entry, isHidden);
         }
 
-        private void OnDealerCardRevealed()
+        private void OnDealerCardRevealed(System.Action onComplete)
         {
-            _gameUI?.RevealDealerHiddenCard(); // ← 기존 카드 뒤집기
+            _gameUI?.RevealDealerHiddenCard(onComplete); // ← 기존 카드 뒤집기
         }
 
         private void OnDealerTurnEnded()

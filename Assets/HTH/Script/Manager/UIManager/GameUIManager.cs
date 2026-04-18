@@ -122,8 +122,8 @@ namespace HTH
         // ─── 필드 — Add 방식 ─────────────────────────────────────
 
         /// <summary>플레이어 필드에 카드 1장을 추가합니다.</summary>
-        public void AddPlayerFieldCard(DeckSO.CardEntry entry)
-            => _fieldManager.AddPlayerFieldCard(entry);
+        public void AddPlayerFieldCard(DeckSO.CardEntry entry, bool createSlot = false)
+            => _fieldManager.AddPlayerFieldCard(entry, createSlot);
 
         /// <summary>딜러 필드에 카드 1장을 추가합니다.</summary>
         public void AddDealerFieldCard(DeckSO.CardEntry entry, bool isHidden = false)
@@ -152,7 +152,19 @@ namespace HTH
             => _fieldManager.HighlightHandCard(index);
 
         /// <summary>딜러 비공개 카드를 앞면으로 뒤집습니다.</summary>
-        public void RevealDealerHiddenCard()
-            => _fieldManager.RevealDealerHiddenCard();
+        public void RevealDealerHiddenCard(System.Action onComplete = null)
+            => _fieldManager.RevealDealerHiddenCard(onComplete);
+
+        /// <summary>
+        /// 연산자 카드 사용/버리기 선택 UI를 표시합니다.
+        /// </summary>
+        public void ShowOperatorChoice(Action onDiscard)
+            => _gamePanelManager.ShowOperatorChoice(onDiscard);
+
+        public void HideOperatorChoice()
+            => _gamePanelManager.HideOperatorChoice();
+
+        public void RemoveHandCard()
+            => _fieldManager.RemoveHandCard();
     }
 }

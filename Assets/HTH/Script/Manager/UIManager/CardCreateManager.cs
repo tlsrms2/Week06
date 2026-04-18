@@ -29,6 +29,10 @@ namespace HTH
         [Tooltip("플레이어 카드가 뒤집히는 중앙 위치")]
         [SerializeField] private Transform _centerPoint;
 
+        [Header("연산자 위치")]
+        [Tooltip("연산자 카드 손패 배치 기준점")]
+        [SerializeField] private Transform _handAnchor;
+
         [Tooltip("카드 뒤집기 애니메이션 시간 (초)")]
         [SerializeField] private float _flipDuration = 0.3f;
 
@@ -82,8 +86,40 @@ namespace HTH
         /// 손패용 UI 카드를 생성합니다.
         /// parent : Canvas 안 RectTransform
         /// </summary>
-        public ICardView CreateHandCard(RectTransform parent, DeckSO.CardEntry entry)
-            => CreateUI(parent, entry.data);
+        public ICardView CreateHandCard(RectTransform parent, DeckSO.CardEntry entry, Action onArrived = null) // ← onArrived 콜백 추가
+        {
+            var go = SpawnCard(entry, out Card3DView view);
+            if (go == null) return null;
+
+            StartCoroutine(MoveHandCard(go, view, onArrived)); // ← 코루틴으로 이동
+            return view;
+        }
+        private IEnumerator MoveHandCard(GameObject go, Card3DView view, Action onArrived)
+        {
+            if (go == null) yield break;
+
+            var anchor = _handAnchor != null ? _handAnchor : _deckTransform;
+            var targetPos = anchor.position;
+
+            // 1. 덱 → _handAnchor 이동 (비공개 상태)
+            yield return StartCoroutine(
+                MoveWorld(go, go.transform.position, targetPos, _moveToFieldDuration));
+
+            if (go == null) yield break;
+
+            // 2. 부모 설정
+            go.transform.SetParent(anchor, worldPositionStays: false);
+            go.transform.localPosition = Vector3.zero;
+
+            // 3. 도착 후 앞면으로 뒤집기
+            yield return StartCoroutine(FlipCard(go, view, _flipDuration));
+
+            if (go == null) yield break;
+
+            // 4. 클릭 가능 상태로 전환
+            view.SetInteractable(true);
+            onArrived?.Invoke();
+        }
 
         // ─── 카드 공통 생성 ───────────────────────────────────────
 
@@ -255,41 +291,6 @@ namespace HTH
             }
             if (go != null)
                 go.transform.position = to;
-        }
-
-        // ─── UI 카드 생성 ─────────────────────────────────────────
-
-        private ICardView CreateUI(RectTransform parent, CardDataSO data)
-        {
-            var go = new GameObject( $"Card_{data.displayLabel}", typeof(RectTransform),
-                typeof(UnityEngine.UI.Image), typeof(UnityEngine.UI.Button));
-
-            if (parent != null)
-                go.transform.SetParent(parent, false);
-
-            var rt = go.GetComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(65f, 90f);
-
-            var le = go.AddComponent<UnityEngine.UI.LayoutElement>();
-            le.preferredWidth = 65f;
-            le.preferredHeight = 90f;
-
-            var txtGo = new GameObject("Label", typeof(RectTransform), typeof(TMPro.TextMeshProUGUI));
-            txtGo.transform.SetParent(go.transform, false);
-
-            var txtRt = txtGo.GetComponent<RectTransform>();
-            txtRt.anchorMin = Vector2.zero;
-            txtRt.anchorMax = Vector2.one;
-            txtRt.offsetMin = Vector2.zero;
-            txtRt.offsetMax = Vector2.zero;
-
-            var txt = txtGo.GetComponent<TMPro.TextMeshProUGUI>();
-            txt.fontSize = 32;
-            txt.alignment = TMPro.TextAlignmentOptions.Center;
-
-            var view = go.AddComponent<Card3DView>();
-            view.Initialize(data);
-            return view;
         }
     }
 }

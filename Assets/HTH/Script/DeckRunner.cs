@@ -1,14 +1,12 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
-using static UnityEngine.EventSystems.EventTrigger;
 
 namespace HTH
 {
     /// <summary>
-    /// DeckSO를 런타임 Queue로 변환하고 드로우를 담당합니다.
-    /// SO 에셋 자체는 불변이며 매 라운드 새 인스턴스를 생성합니다.
-    ///
-    /// CardEntry = CardDataSO + CardSuit 쌍으로 카드 한 장을 표현합니다.
+    /// DeckSO와 StageDataSO를 받아 런타임 덱을 구성합니다.
+    /// 덱에는 숫자 카드만 포함됩니다.
+    /// 연산자 카드는 GameManager에서 확률 판정으로 별도 지급합니다.
     /// </summary>
     public class DeckRunner
     {
@@ -31,12 +29,6 @@ namespace HTH
 
             // DeckSO에서 전체 카드 목록 가져오기 (CardEntry 리스트)
             var cards = new List<DeckSO.CardEntry>(deck.GetAllCards());
-
-            // 연산자 카드 주입 (Stage 2+)
-            // 런타임 CreateInstance 대신 DeckSO.operatorCards SO를 사용
-            if (stage.useOperatorCards && deck.operatorCards != null)
-                InjectOperatorCards(cards, deck.operatorCards, stage.operatorCardRatio);
-
             // 셔플
             if (shuffle) Shuffle(cards);
 
@@ -77,30 +69,6 @@ namespace HTH
         }
 
         // ─── 내부 ─────────────────────────────────────────────────
-
-        /// <summary>
-        /// 연산자 카드를 비율에 따라 덱에 주입합니다.
-        /// DeckSO.operatorCards 목록에서 순서대로 선택합니다.
-        /// </summary>
-        private void InjectOperatorCards(
-            List<DeckSO.CardEntry> cards,
-            List<CardDataSO> operatorCards,
-            float ratio)
-        {
-            if (operatorCards == null || operatorCards.Count == 0) return;
-
-            int count = Mathf.RoundToInt(cards.Count * ratio);
-
-            for (int i = 0; i < count; i++)
-            {
-                var op = operatorCards[i % operatorCards.Count];
-                cards.Add(new DeckSO.CardEntry
-                {
-                    data = op,
-                    suit = CardSuit.Spade // 연산자 카드는 무늬 없음
-                });
-            }
-        }
 
         /// <summary>Fisher-Yates 셔플</summary>
         private void Shuffle(List<DeckSO.CardEntry> cards)

@@ -149,6 +149,14 @@ namespace HTH
             UnityEngine.Debug.Log(log.ToString());
         }
 
+        /// <summary>손패 마지막 연산자 카드를 버립니다.</summary>
+        public void DiscardLastOperator()
+        {
+            if (Hand.Count == 0) return;
+            Hand.RemoveAt(Hand.Count - 1);
+            OnHandChanged?.Invoke();
+        }
+
         // ─── 선택 해제 ────────────────────────────────────────────
 
         /// <summary>손패 선택 상태와 슬롯 하이라이트를 해제합니다.</summary>

@@ -26,6 +26,9 @@ namespace HTH
 
         // ─── 상태 ─────────────────────────────────────────────────
         private bool _interactable = true;
+        private bool _isSelected = false;
+
+        private float _selectedOffsetY = 0.2f;
 
         // ─── 앞뒤면 각도 ──────────────────────────────────────────
         private static readonly Quaternion FaceUpRotation
@@ -46,6 +49,17 @@ namespace HTH
         private void OnMouseDown()
         {
             if (!_interactable) return;
+
+            // 연산자 카드만 선택 시 이동
+            if (Data != null && Data.cardType == CardType.Operator)
+            {
+                _isSelected = !_isSelected;
+
+                var pos = transform.localPosition;
+                pos.x = _isSelected ? _selectedOffsetY : 0f;
+                transform.localPosition = pos;
+            }
+
             OnClicked?.Invoke(this);
         }
 
@@ -67,8 +81,12 @@ namespace HTH
         /// <summary>선택 상태를 시각적으로 표시합니다.</summary>
         public void SetSelected(bool selected)
         {
+            // 연산자 카드만 위치 변경
+            if (Data == null || Data.cardType != CardType.Operator) return;
+
+            _isSelected = selected;
             var pos = transform.localPosition;
-            pos.y = selected ? 0.05f : 0f;
+            pos.x = selected ? _selectedOffsetY : 0f;
             transform.localPosition = pos;
         }
 

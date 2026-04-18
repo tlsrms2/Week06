@@ -213,14 +213,14 @@ namespace HTH
             if (_dealerStrategy is DealerAI ai)
                 ai.SetBustThreshold(_stageManager.CurrentStage.bustValue);
 
-            _gameUI?.EnableGameButtons();
+            _gameUI?.DisableGameButtons();
             _gameUI?.ClearDealerValue();
 
             // Refresh 대신 ClearAllFields 후 초기 딜링
             // 초기 딜링에서 AddPlayerFieldCard / AddDealerFieldCard가 호출됨
             _gameUI?.ClearAllFields();
 
-            StartCoroutine(DealInitialCardsRoutine());
+            StartCoroutine(DealInitialAndEnable());
 
             if (_gameUI != null)
             {
@@ -229,6 +229,11 @@ namespace HTH
             }
 
             UI_ShowPlayerTurn();
+        }
+        private IEnumerator DealInitialAndEnable()
+        {
+            yield return StartCoroutine(DealInitialCardsRoutine());
+            _gameUI?.EnableGameButtons();
         }
 
         // ─── 초기 딜링 ────────────────────────────────────────────
@@ -391,21 +396,53 @@ namespace HTH
 
                 _hitCount++;
 
-                // OnFieldChanged 이벤트 일시 차단
                 _playerHandManager.OnFieldChanged -= OnPlayerFieldChanged;
                 _playerHandManager.AddNumberToField(entry);
 
-                _gameUI?.AddPlayerFieldCard(entry);
+                // 연산자 카드 확률 판정
+                if (stage.useOperatorCards &&
+                    stage.operatorCardRatio > 0f &&
+                    Random.value < stage.operatorCardRatio)
+                {
+                    var opCards = stage.deck.operatorCards;
+                    if (opCards != null && opCards.Count > 0)
+                    {
+                        var opData = opCards[Random.Range(0, opCards.Count)];
+                        var opEntry = new DeckSO.CardEntry
+                        {
+                            data = opData,
+                            suit = CardSuit.Spade,
+                            suitData = null
+                        };
+
+                        Debug.Log($"[GM] 연산자 카드 추가 — {opData.displayLabel} " +
+                                  $"(확률:{stage.operatorCardRatio:P0})");
+
+                        _gameUI?.DisableGameButtons();
+                        _playerHandManager.AddOperatorToHand(opEntry);
+
+                        _gameUI?.ShowOperatorChoice(
+                            onDiscard: () =>
+                            {
+                                _playerHandManager.DiscardLastOperator();
+                                _gameUI?.EnableGameButtons();
+                            });
+
+                        // ← 재구독 후 UI 갱신하고 흐름 중단
+                        _playerHandManager.OnFieldChanged += OnPlayerFieldChanged;
+                        _gameUI?.AddPlayerFieldCard(entry, createSlot: stage.useOperatorCards);
+                        _gameUI?.UpdatePlayerValue(_playerHandManager.FieldData, stage);
+                        return;
+                    }
+                }
+
+                // 연산자 카드 없을 때 — 기존 흐름 계속
+                _gameUI?.AddPlayerFieldCard(entry, createSlot: stage.useOperatorCards);
 
                 bool bust = _blackjackManager.IsPlayerBust(_playerHandManager.FieldData, stage);
 
-                Debug.Log($"[GM] Hit — " +
-                          $"total:{_blackjackManager.EvaluatePlayer(_playerHandManager.FieldData, stage)} " +
-                          $"bust:{bust}");
-
                 if (bust)
                 {
-                    // 버스트 — HUD 값 갱신 후 Result 전환
                     _gameUI?.UpdatePlayerValue(_playerHandManager.FieldData, stage);
                     _playerHandManager.OnFieldChanged += OnPlayerFieldChanged;
                     ExitPlayerTurn();
@@ -457,7 +494,11 @@ namespace HTH
         private void OnOperatorSlotSelected(int slotIndex)
         {
             if (_playerHandManager.TryPlaceOperator(slotIndex, out DeckSO.CardEntry placed))
+            {
                 _gameUI?.PlaceOperatorOnSlot(slotIndex, placed.data.operatorType);
+                _gameUI?.HideOperatorChoice();
+                _gameUI?.EnableGameButtons();
+            }
         }
 
         private System.Collections.IEnumerator DelayedTransition(
@@ -479,7 +520,7 @@ namespace HTH
 
             // 마지막으로 추가된 카드만 UI에 추가
             var last = _playerHandManager.Field[_playerHandManager.Field.Count - 1];
-            _gameUI?.AddPlayerFieldCard(last);
+            _gameUI?.AddPlayerFieldCard(last, createSlot: _stageManager.CurrentStage.useOperatorCards);
             _gameUI?.UpdatePlayerValue(_playerHandManager.FieldData, _stageManager.CurrentStage);
         }
 

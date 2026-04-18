@@ -32,6 +32,10 @@ namespace HTH
         [SerializeField] private TextMeshProUGUI _gameOverDetailText;
         [SerializeField] private Button _gameOverRestartButton;
 
+        [Header("연산자 선택 패널")]
+        [SerializeField] private GameObject _operatorChoicePanel;
+        [SerializeField] private Button _operatorDiscardButton;
+
         // ─── Hit/Stay ─────────────────────────────────────────────
 
         /// <summary>Hit / Stay 버튼 콜백을 등록합니다.</summary>
@@ -154,5 +158,19 @@ namespace HTH
                 onRestart?.Invoke();
             });
         }
+        public void ShowOperatorChoice(Action onDiscard)
+        {
+            _operatorChoicePanel?.SetActive(true);
+
+            _operatorDiscardButton.onClick.RemoveAllListeners();
+            _operatorDiscardButton.onClick.AddListener(() =>
+            {
+                _operatorChoicePanel?.SetActive(false);
+                onDiscard?.Invoke();
+            });
+        }
+
+        public void HideOperatorChoice()
+            => _operatorChoicePanel?.SetActive(false);
     }
 }

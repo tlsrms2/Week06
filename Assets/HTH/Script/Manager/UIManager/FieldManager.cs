@@ -32,6 +32,13 @@ namespace HTH
         [Header("손패 / 연산자 슬롯 UI (Canvas 안 RectTransform)")]
         [SerializeField] private RectTransform _playerHandContainer;
 
+        [Header("연산자 슬롯 3D")]
+        [Tooltip("연산자 슬롯 프리팹 — OperatorSlot3D 컴포넌트 포함")]
+        [SerializeField] private GameObject _operatorSlotPrefab;
+
+        [Tooltip("슬롯 가로 크기 (카드 간격 계산용)")]
+        [SerializeField] private float _slotWidth = 0.05f;
+
         // ─── 의존성 ───────────────────────────────────────────────
         private CardCreateManager _cardCreate;
 
@@ -39,9 +46,9 @@ namespace HTH
         private readonly List<ICardView> _playerFieldCards = new();
         private readonly List<ICardView> _dealerFieldCards = new();
         private readonly List<ICardView> _playerHandCards = new();
-        private readonly List<GameObject> _operatorSlots = new();
-        private readonly List<Image> _operatorSlotImages = new();
-        private readonly List<TextMeshProUGUI> _operatorSlotTexts = new();
+
+        // 변경 — 3개 → 1개로 통합
+        private readonly List<OperatorSlot3D> _operatorSlots3D = new();
 
         private ICardView _dealerHiddenCardView;
 
@@ -63,46 +70,68 @@ namespace HTH
 
         // ─── 플레이어 필드 (3D) ───────────────────────────────────
 
-        public void AddPlayerFieldCard(DeckSO.CardEntry entry)
+        public void AddPlayerFieldCard(DeckSO.CardEntry entry, bool createSlot = false)
         {
             if (entry.data.cardType != CardType.Number) return;
 
-            if (_playerFieldCards.Count > 0)
-                CreateOperatorSlot(_playerFieldCards.Count - 1);
+            if (createSlot && _playerFieldCards.Count > 0)
+                CreateOperatorSlot3D(_playerFieldCards.Count - 1);
 
             int index = _playerFieldCards.Count;
             Vector3 targetPos = CalcLocalPos(index, _maxCardsPerRow, _cardSpacingX, _cardSpacingY);
 
             var view = _cardCreate.CreatePlayerFieldCard(
-                _playerFieldAnchor, entry, targetPos,
-                onArrived: () => RealignCards(
-                    _playerFieldCards, _maxCardsPerRow, _cardSpacingX, _cardSpacingY));
+                _playerFieldAnchor, entry, targetPos, 
+                onArrived: () => RealignPlayerFieldWithSlots(createSlot));
 
             if (view == null) return;
 
             view.SetInteractable(false);
             _playerFieldCards.Add(view);
         }
+        // 추가
+        private void RealignPlayerFieldWithSlots(bool hasSlots)
+        {
+            if (!hasSlots)
+            {
+                RealignCards(_playerFieldCards, _maxCardsPerRow, _cardSpacingX, _cardSpacingY);
+                return;
+            }
+
+            int cardCount = _playerFieldCards.Count;
+            int slotCount = _operatorSlots3D.Count;
+            if (cardCount == 0) return;
+
+            float totalWidth = cardCount * _cardSpacingX + slotCount * _slotWidth;
+            float startX = -totalWidth / 2f;
+            float curX = startX;
+
+            for (int i = 0; i < cardCount; i++)
+            {
+                if (_playerFieldCards[i] is MonoBehaviour mb && mb != null)
+                {
+                    mb.transform.localPosition = new Vector3(curX, 0f, 0f);
+                    curX += _cardSpacingX;
+                }
+
+                if (i < slotCount && _operatorSlots3D[i] != null)
+                {
+                    _operatorSlots3D[i].transform.localPosition = new Vector3(curX, 0f, 0f);
+                    curX += _slotWidth;
+                }
+            }
+        }
 
         public void PlaceOperatorOnSlot(int slotIndex, OperatorType op)
         {
-            if (slotIndex < 0 || slotIndex >= _operatorSlotTexts.Count) return;
-
-            _operatorSlotTexts[slotIndex].text = op switch
-            {
-                OperatorType.Subtract => "−",
-                OperatorType.Multiply => "×",
-                OperatorType.Divide => "÷",
-                _ => "+"
-            };
-            _operatorSlotTexts[slotIndex].color = UIColor.CardText;
-            _operatorSlotImages[slotIndex].color = UIColor.CardOpBg;
+            if (slotIndex < 0 || slotIndex >= _operatorSlots3D.Count) return;
+            _operatorSlots3D[slotIndex].SetOccupied(op); // ← 컴포넌트가 처리
         }
 
         public void HighlightAvailableSlots(bool highlight)
         {
-            foreach (var img in _operatorSlotImages)
-                img.color = highlight ? UIColor.Selected : UIColor.SlotDefault;
+            foreach (var slot in _operatorSlots3D)
+                slot.SetHighlight(highlight);
         }
 
         public void ClearPlayerField()
@@ -112,59 +141,23 @@ namespace HTH
                     Destroy(mb.gameObject);
             _playerFieldCards.Clear();
 
-            foreach (var go in _operatorSlots)
-                if (go != null) Destroy(go);
-            _operatorSlots.Clear();
-            _operatorSlotImages.Clear();
-            _operatorSlotTexts.Clear();
+            foreach (var slot in _operatorSlots3D)
+                if (slot != null) Destroy(slot.gameObject);
+            _operatorSlots3D.Clear();
         }
 
-        private void CreateOperatorSlot(int slotIndex)
+        private void CreateOperatorSlot3D(int slotIndex)
         {
-            var slotGo = new GameObject(
-                $"OpSlot_{slotIndex}",
-                typeof(RectTransform),
-                typeof(Image),
-                typeof(Button));
+            if (_operatorSlotPrefab == null) return;
 
-            slotGo.transform.SetParent(_playerHandContainer, false);
+            var go = Instantiate(_operatorSlotPrefab, _playerFieldAnchor);
+            var slot = go.GetComponent<OperatorSlot3D>();
 
-            var slotRt = slotGo.GetComponent<RectTransform>();
-            slotRt.sizeDelta = new Vector2(45, 65);
+            if (slot == null) { Destroy(go); return; }
 
-            var slotImg = slotGo.GetComponent<Image>();
-            slotImg.color = UIColor.SlotDefault;
-
-            var slotTxtGo = new GameObject("Label",
-                typeof(RectTransform), typeof(TextMeshProUGUI));
-            slotTxtGo.transform.SetParent(slotGo.transform, false);
-
-            var slotTxtRt = slotTxtGo.GetComponent<RectTransform>();
-            slotTxtRt.anchorMin = Vector2.zero;
-            slotTxtRt.anchorMax = Vector2.one;
-            slotTxtRt.offsetMin = Vector2.zero;
-            slotTxtRt.offsetMax = Vector2.zero;
-
-            var slotTxt = slotTxtGo.GetComponent<TextMeshProUGUI>();
-            slotTxt.text = "+";
-            slotTxt.fontSize = 28;
-            slotTxt.color = UIColor.SlotText;
-            slotTxt.alignment = TextAlignmentOptions.Center;
-            slotTxt.fontStyle = FontStyles.Bold;
-
-            var le = slotGo.AddComponent<LayoutElement>();
-            le.preferredWidth = 45;
-            le.preferredHeight = 65;
-            le.minWidth = 45;
-            le.minHeight = 65;
-
-            int captured = slotIndex;
-            slotGo.GetComponent<Button>().onClick.AddListener(
-                () => OnOperatorSlotClicked?.Invoke(captured));
-
-            _operatorSlots.Add(slotGo);
-            _operatorSlotImages.Add(slotImg);
-            _operatorSlotTexts.Add(slotTxt);
+            slot.Initialize(slotIndex);
+            slot.OnSlotClicked += idx => OnOperatorSlotClicked?.Invoke(idx);
+            _operatorSlots3D.Add(slot);
         }
 
         // ─── 딜러 필드 (3D) ──────────────────────────────────────
@@ -261,12 +254,9 @@ namespace HTH
             return new Vector3(x, y, 0f);
         }
 
-        private void RealignCards(
-            List<ICardView> cards,
-            int maxPerRow,
-            float spacingX,
-            float spacingY)
+        private void RealignCards(List<ICardView> cards, int maxPerRow, float spacingX, float spacingY)
         {
+
             int totalCards = cards.Count;
             if (totalCards == 0) return;
 

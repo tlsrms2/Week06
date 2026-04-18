@@ -123,7 +123,7 @@ namespace HTH
 
         /// <summary>플레이어 필드에 카드 1장을 추가합니다.</summary>
         public void AddPlayerFieldCard(DeckSO.CardEntry entry, bool createSlot = false)
-            => _fieldManager.AddPlayerFieldCard(entry);
+            => _fieldManager.AddPlayerFieldCard(entry, createSlot);
 
         /// <summary>딜러 필드에 카드 1장을 추가합니다.</summary>
         public void AddDealerFieldCard(DeckSO.CardEntry entry, bool isHidden = false)
@@ -163,5 +163,8 @@ namespace HTH
 
         public void HideOperatorChoice()
             => _gamePanelManager.HideOperatorChoice();
+
+        public void RemoveHandCard()
+            => _fieldManager.RemoveHandCard();
     }
 }

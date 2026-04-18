@@ -425,6 +425,7 @@ namespace HTH
                             onDiscard: () =>
                             {
                                 _playerHandManager.DiscardLastOperator();
+                                _gameUI?.RemoveHandCard();
                                 _gameUI?.EnableGameButtons();
                             });
 
@@ -496,8 +497,12 @@ namespace HTH
             if (_playerHandManager.TryPlaceOperator(slotIndex, out DeckSO.CardEntry placed))
             {
                 _gameUI?.PlaceOperatorOnSlot(slotIndex, placed.data.operatorType);
+                //_gameUI?.RemoveHandCard();
                 _gameUI?.HideOperatorChoice();
                 _gameUI?.EnableGameButtons();
+
+                // ← 연산자 배치 후 값 갱신
+                _gameUI?.UpdatePlayerValue(_playerHandManager.FieldData, _stageManager.CurrentStage);
             }
         }
 
@@ -518,10 +523,22 @@ namespace HTH
         {
             if (_playerHandManager.Field.Count == 0) return;
 
-            // 마지막으로 추가된 카드만 UI에 추가
             var last = _playerHandManager.Field[_playerHandManager.Field.Count - 1];
-            _gameUI?.AddPlayerFieldCard(last, createSlot: _stageManager.CurrentStage.useOperatorCards);
-            _gameUI?.UpdatePlayerValue(_playerHandManager.FieldData, _stageManager.CurrentStage);
+
+            // ← 연산자 카드면 AddPlayerFieldCard 스킵
+            if (last.data.cardType == CardType.Operator)
+            {
+                _gameUI?.UpdatePlayerValue(
+                    _playerHandManager.FieldData,
+                    _stageManager.CurrentStage);
+                return;
+            }
+
+            _gameUI?.AddPlayerFieldCard(last,
+                createSlot: _stageManager.CurrentStage.useOperatorCards);
+            _gameUI?.UpdatePlayerValue(
+                _playerHandManager.FieldData,
+                _stageManager.CurrentStage);
         }
 
         /// <summary>

@@ -4734,11 +4734,12 @@ MonoBehaviour:
   _dealerFieldAnchor: {fileID: 66064433}
   _cardSpacingX: 0.15
   _cardSpacingY: 0.25
-  _maxCardsPerRow: 8
+  _maxCardsPerRow: 5
   _revealFlipDuration: 0.4
   _playerHandContainer: {fileID: 1721325898}
-  _operatorSlotPrefab: {fileID: 2957822907216399208, guid: bf75833717328c748bbbef20e8986a16, type: 3}
-  _slotWidth: 0.05
+  _operatorSlotPrefab: {fileID: 4655848394221754609, guid: 1c11380df28eca64a91e60925ccafb92, type: 3}
+  _operatorMoveToSlotDuration: 0.3
+  _slotWidth: 0.15
 --- !u!1001 &869222171
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -8076,7 +8077,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1284359629
 RectTransform:
   m_ObjectHideFlags: 0

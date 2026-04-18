@@ -1,0 +1,12 @@
+Font: YEONGNAMNEWS_Ku_Sang  Style: Regular
+Point Size: 80   Padding: 0   SP/PD Ratio: 0.0%
+
+Characters included: 11267/11267
+Missing characters: 0
+Excluded characters: 0
+
+Characters missing from font file:
+----------------------------------------
+
+Characters excluded from packing:
+----------------------------------------

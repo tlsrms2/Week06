@@ -55,7 +55,6 @@ namespace HTH
             var go = SpawnCard(entry, out Card3DView view);
             if (go == null) return null;
 
-            view.SetFaceDown();
             StartCoroutine(MovePlayerCard(go, view, parent, targetLocalPos, onArrived));
             return view;
         }
@@ -67,7 +66,7 @@ namespace HTH
         /// targetPos : 필드에서의 최종 localPosition
         /// </summary>
         public ICardView CreateDealerFieldCard(Transform parent, DeckSO.CardEntry entry, 
-            Vector3 targetLocalPos, bool isHidden = true, Action onArrived = null)
+            Vector3 targetLocalPos, bool isHidden = false, Action onArrived = null)
         {
             var go = SpawnCard(entry, out Card3DView view);
             if (go == null) return null;
@@ -131,8 +130,10 @@ namespace HTH
             var startPos = _deckTransform != null
                 ? _deckTransform.position
                 : Vector3.zero;
-
+            
+            // 카드 생성
             var go = Instantiate(prefab, startPos, Quaternion.identity);
+            go.transform.rotation = Quaternion.identity;
 
             var rigid = go.GetComponent<Rigidbody>();
             if (rigid != null)

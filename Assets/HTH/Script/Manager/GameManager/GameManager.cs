@@ -82,6 +82,7 @@ namespace HTH
             _playerHandManager.OnHandChanged += OnPlayerHandChanged;
             _playerHandManager.OnHandSelectionChanged += OnHandSelectionChanged;
             _playerHandManager.OnSlotHighlightRequested += OnSlotHighlightRequested;
+
             _dealerManager.OnDealerCardAdded += OnDealerCardAdded;
             _dealerManager.OnDealerTurnEnded += OnDealerTurnEnded;
             _dealerManager.OnDealerCardRevealed += OnDealerCardRevealed;
@@ -96,6 +97,7 @@ namespace HTH
             _playerHandManager.OnHandChanged -= OnPlayerHandChanged;
             _playerHandManager.OnHandSelectionChanged -= OnHandSelectionChanged;
             _playerHandManager.OnSlotHighlightRequested -= OnSlotHighlightRequested;
+
             _dealerManager.OnDealerCardAdded -= OnDealerCardAdded;
             _dealerManager.OnDealerTurnEnded -= OnDealerTurnEnded;
             _dealerManager.OnDealerCardRevealed -= OnDealerCardRevealed;
@@ -502,9 +504,9 @@ namespace HTH
             _gameUI?.AddDealerFieldCard(entry, isHidden);
         }
 
-        private void OnDealerCardRevealed()
+        private void OnDealerCardRevealed(System.Action onComplete)
         {
-            _gameUI?.RevealDealerHiddenCard(); // ← 기존 카드 뒤집기
+            _gameUI?.RevealDealerHiddenCard(onComplete); // ← 기존 카드 뒤집기
         }
 
         private void OnDealerTurnEnded()

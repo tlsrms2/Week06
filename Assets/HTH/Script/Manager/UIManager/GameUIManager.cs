@@ -152,7 +152,7 @@ namespace HTH
             => _fieldManager.HighlightHandCard(index);
 
         /// <summary>딜러 비공개 카드를 앞면으로 뒤집습니다.</summary>
-        public void RevealDealerHiddenCard()
-            => _fieldManager.RevealDealerHiddenCard();
+        public void RevealDealerHiddenCard(System.Action onComplete = null)
+            => _fieldManager.RevealDealerHiddenCard(onComplete);
     }
 }

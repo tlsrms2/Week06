@@ -6,12 +6,11 @@ namespace HTH
 {
     /// <summary>
     /// 딜러 턴 진행과 딜러 필드를 담당합니다.
-    /// DeckSO.CardEntry(data + suit + suitData)로 카드 한 장을 관리합니다.
-    /// Stage 2+에서는 연산자 카드를 손패에 보관하고 AI가 자동 배치합니다.
     ///
     /// 이벤트 구분
-    /// ├── OnDealerCardAdded   : 새 카드가 필드에 추가될 때 → UI 카드 생성
-    /// ├── OnDealerCardRevealed: 비공개 카드가 공개될 때 → 기존 카드 뒤집기
+    /// ├── OnDealerCardAdded    : 새 카드가 필드에 추가될 때 → UI 카드 생성
+    /// ├── OnDealerCardRevealed : 비공개 카드 공개 요청 → FieldManager가 애니메이션 처리
+    ///                           Action 콜백으로 완료 시점을 전달
     /// └── OnDealerTurnEnded   : 딜러 턴 종료 시
     /// </summary>
     public class DealerManager : MonoBehaviour
@@ -27,14 +26,14 @@ namespace HTH
         public List<CardDataSO> FieldData => Field.ConvertAll(e => e.data);
 
         // ─── 이벤트 ──────────────────────────────────────────────
-        /// <summary>새 카드가 필드에 추가될 때 발행 → UI 카드 생성</summary>
+        /// <summary>새 카드가 필드에 추가될 때 발행 (entry, isHidden)</summary>
         public event System.Action<DeckSO.CardEntry, bool> OnDealerCardAdded;
 
         /// <summary>
-        /// 비공개 카드가 공개될 때 발행 → 기존 뒷면 카드를 SetFaceUp()
-        /// 새 카드를 생성하지 않음
+        /// 비공개 카드 공개 요청.
+        /// Action 콜백 = 뒤집기 완료 후 호출할 함수 (RunTurn 재개용)
         /// </summary>
-        public event System.Action OnDealerCardRevealed;
+        public event System.Action<System.Action> OnDealerCardRevealed;
 
         /// <summary>딜러 턴이 완전히 종료되면 발행</summary>
         public event System.Action OnDealerTurnEnded;
@@ -50,44 +49,57 @@ namespace HTH
 
         // ─── 초기 딜링 ────────────────────────────────────────────
 
-        /// <summary>딜러 공개 카드를 추가합니다.</summary>
         public void AddOpenCard(DeckSO.CardEntry entry)
         {
             Field.Add(entry);
-            OnDealerCardAdded?.Invoke(entry, false); // isHidden = false → 앞면 생성
+            OnDealerCardAdded?.Invoke(entry, false);
         }
 
-        /// <summary>딜러 비공개 카드를 설정합니다. UI에는 뒷면으로 표시됩니다.</summary>
         public void SetHiddenCard(DeckSO.CardEntry entry)
         {
             _hiddenCard = entry;
-            OnDealerCardAdded?.Invoke(entry, true); // isHidden = true → 뒷면 생성
+            OnDealerCardAdded?.Invoke(entry, true);
         }
 
         /// <summary>
-        /// 비공개 카드를 공개합니다. 딜러 턴 시작 시 호출합니다.
-        /// OnDealerCardRevealed를 발행해 기존 뒷면 카드를 뒤집습니다.
-        /// 새 카드를 생성하지 않습니다.
+        /// 비공개 카드 공개 요청을 발행합니다.
+        /// onComplete : 뒤집기 애니메이션 완료 후 호출될 콜백
         /// </summary>
-        public void RevealHiddenCard()
+        public void RevealHiddenCard(System.Action onComplete = null)
         {
-            if (_hiddenCard == null) return;
+            if (_hiddenCard == null)
+            {
+                onComplete?.Invoke();
+                return;
+            }
+
             Field.Add(_hiddenCard);
             _hiddenCard = null;
 
-            // ← OnDealerCardAdded가 아닌 OnDealerCardRevealed 발행
-            // UI에서 새 카드 생성 없이 기존 뒷면 카드를 SetFaceUp()으로 처리
-            OnDealerCardRevealed?.Invoke();
+            // FieldManager가 애니메이션 처리 후 onComplete 호출
+            OnDealerCardRevealed?.Invoke(onComplete);
         }
 
         // ─── 딜러 턴 ─────────────────────────────────────────────
 
-        public IEnumerator RunTurn(DeckRunner deckRunner, IDealerStrategy dealerStrategy, StageDataSO stage)
+        /// <summary>
+        /// 딜러 턴을 실행합니다.
+        /// 비공개 카드 뒤집기 애니메이션 완료 후 카드 드로우를 시작합니다.
+        /// </summary>
+        public IEnumerator RunTurn(
+            DeckRunner deckRunner,
+            IDealerStrategy dealerStrategy,
+            StageDataSO stage)
         {
-            // Stay 후 비공개 카드 공개
-            RevealHiddenCard();
-            yield return new WaitForSeconds(0.5f);
+            // 비공개 카드 뒤집기 — 완료 콜백으로 코루틴 재개
+            bool revealed = false;
+            RevealHiddenCard(onComplete: () => revealed = true);
 
+            // 뒤집기 완료까지 대기
+            yield return new WaitUntil(() => revealed);
+            yield return new WaitForSeconds(0.3f);
+
+            // 딜러 카드 드로우 루프
             while (true)
             {
                 if (stage.useOperatorCards && Hand.Count > 0)
@@ -119,7 +131,7 @@ namespace HTH
                 if (entry.data.cardType == CardType.Number)
                 {
                     Field.Add(entry);
-                    OnDealerCardAdded?.Invoke(entry, false); // 새 카드 → 앞면 생성
+                    OnDealerCardAdded?.Invoke(entry, false);
                     yield return new WaitForSeconds(0.8f);
                 }
                 else if (stage.useOperatorCards)

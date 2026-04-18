@@ -28,7 +28,7 @@ namespace HTH
         private bool _interactable = true;
         private bool _isSelected = false;
 
-        private float _selectedOffsetY = 0.2f;
+        private float _selectedOffsetY = 0.22f;
 
         // ─── 앞뒤면 각도 ──────────────────────────────────────────
         private static readonly Quaternion FaceUpRotation

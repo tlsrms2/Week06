@@ -23,7 +23,11 @@ namespace HTH
         [Header("카드 정렬 설정")]
         [SerializeField] private float _cardSpacingX = 0.15f;
         [SerializeField] private float _cardSpacingY = 0.25f;
+        [Tooltip("플레이어 한 줄 최대 카드 수")]
         [SerializeField] private int _maxCardsPerRow = 5;
+
+        [Tooltip("딜러 한 줄 최대 카드 수")]
+        [SerializeField] private int _dealerMaxCardsPerRow = 5;
 
         [Header("딜러 카드 뒤집기")]
         [Tooltip("딜러 비공개 카드 뒤집기 시간 (초)")]
@@ -196,10 +200,12 @@ namespace HTH
             _operatorSlots3D[slotIndex] = null;
 
             handMb.transform.SetParent(_playerFieldAnchor, worldPositionStays: true);
+
+            // ← 추가 — 이동 후 클릭 불가
+            handView.SetInteractable(false);
+
             _playerHandCards.RemoveAt(0);
 
-            // ← 연산자 카드 오브젝트 추적
-            // slotIndex 위치에 대응하도록 리스트 크기 맞춤
             while (_placedOperatorObjects.Count <= slotIndex)
                 _placedOperatorObjects.Add(null);
             _placedOperatorObjects[slotIndex] = handMb.gameObject;
@@ -361,6 +367,10 @@ namespace HTH
                 if (slot != null) Destroy(slot.gameObject);
             _operatorSlots3D.Clear();
 
+            //배치된 연산자 카드 오브젝트 Destroy
+            foreach (var go in _placedOperatorObjects)
+                if (go != null) Destroy(go);
+
             _placedOperatorObjects.Clear();
         }
 
@@ -396,12 +406,13 @@ namespace HTH
         public void AddDealerFieldCard(DeckSO.CardEntry entry, bool isHidden = false)
         {
             int index = _dealerFieldCards.Count;
-            Vector3 targetPos = CalcLocalPos(index, _maxCardsPerRow, _cardSpacingX, _cardSpacingY);
+            Vector3 targetPos = CalcLocalPos(
+                index, _dealerMaxCardsPerRow, _cardSpacingX, _cardSpacingY);
 
             var view = _cardCreate.CreateDealerFieldCard(
                 _dealerFieldAnchor, entry, targetPos, isHidden,
                 onArrived: () => RealignCards(
-                    _dealerFieldCards, _maxCardsPerRow, _cardSpacingX, _cardSpacingY));
+                    _dealerFieldCards, _dealerMaxCardsPerRow, _cardSpacingX, _cardSpacingY));
 
             if (view == null) return;
 

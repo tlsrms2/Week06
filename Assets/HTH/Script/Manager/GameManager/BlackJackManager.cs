@@ -60,17 +60,7 @@ namespace HTH
         /// </summary>
         public bool IsPlayerBust(List<CardDataSO> field, StageDataSO stage)
         {
-            // 연산자 스테이지 — 연산자 미배치 시 스킵
-            if (stage.useOperatorCards && !HasOperatorPlaced(field))
-                return false;
-
             long total = EvaluatePlayer(field, stage);
-
-            // 연산자 스테이지이고 손패에 연산자가 있으면 스킵
-            // → GameManager에서 hand 정보를 넘겨줘야 하므로
-            //    여기서는 필드에 연산자가 없을 때만 체크
-            if (stage.useOperatorCards && !HasOperatorPlaced(field))
-                return false;
 
             return total > stage.bustValue;
         }
@@ -82,16 +72,6 @@ namespace HTH
             long total = EvaluatePlayer(field, stage);
 
             return total > stage.bustValue;
-        }
-
-        /// <summary>
-        /// Field에 연산자 카드가 배치되어 있는지 확인합니다.
-        /// </summary>
-        private bool HasOperatorPlaced(List<CardDataSO> field)
-        {
-            foreach (var card in field)
-                if (card.cardType == CardType.Operator) return true;
-            return false;
         }
 
         // ─── 승패 판정 ────────────────────────────────────────────

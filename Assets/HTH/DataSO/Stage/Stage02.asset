@@ -13,14 +13,14 @@ MonoBehaviour:
   m_Name: Stage02
   m_EditorClassIdentifier: Assembly-CSharp::HTH.StageDataSO
   stageIndex: 2
-  bustValue: 1
+  bustValue: 23
   maxHitCount: 0
-  deck: {fileID: 11400000, guid: a4f839fa04da59f4aa7bf83bf4f395a9, type: 2}
-  operatorCardRatio: 1
+  deck: {fileID: 11400000, guid: 2e733954ee662264983956463cbb3a3f, type: 2}
+  operatorCardRatio: 0.3
   operatorOnlyHit: 0
   useFlexibleAce: 0
   useOperatorCards: 1
   normalJudge: 1
   allowNegative: 0
-  visionBetMin: 10
+  visionBetMin: 15
   visionBetMax: 50

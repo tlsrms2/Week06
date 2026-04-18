@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -406,7 +406,7 @@ namespace HTH
                 bool shouldDrawOperator =
                     stage.useOperatorCards &&
                     stage.operatorCardRatio > 0f &&
-                    !_playerHandManager.HasHandCard &&
+                    _playerHandManager.CanReceiveOperatorCard &&
                     Random.value < stage.operatorCardRatio;
 
                 // 한 번의 Hit에서는 숫자/연산자 중 한 장만 지급합니다.
@@ -469,6 +469,13 @@ namespace HTH
             {
                 if (stage.useOperatorCards || stage.operatorOnlyHit)
                 {
+                    if (!_playerHandManager.CanReceiveOperatorCard)
+                    {
+                        _deckRunner.ReturnCard(entry);
+                        yield return StartCoroutine(DrawAndProcess(retryCount + 1));
+                        yield break;
+                    }
+
                     _hitCount++;
                     _playerHandManager.AddOperatorToHand(entry);
 
@@ -675,7 +682,6 @@ namespace HTH
 
         private void OnRestartGame()
         {
-            _stageManager.ResetAndLoad();
             TransitionTo(GameState.Title);
         }
 

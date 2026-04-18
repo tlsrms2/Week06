@@ -8,6 +8,11 @@ namespace HTH
     /// 딜러 턴 진행과 딜러 필드를 담당합니다.
     /// DeckSO.CardEntry(data + suit + suitData)로 카드 한 장을 관리합니다.
     /// Stage 2+에서는 연산자 카드를 손패에 보관하고 AI가 자동 배치합니다.
+    ///
+    /// 이벤트 구분
+    /// ├── OnDealerCardAdded   : 새 카드가 필드에 추가될 때 → UI 카드 생성
+    /// ├── OnDealerCardRevealed: 비공개 카드가 공개될 때 → 기존 카드 뒤집기
+    /// └── OnDealerTurnEnded   : 딜러 턴 종료 시
     /// </summary>
     public class DealerManager : MonoBehaviour
     {
@@ -22,14 +27,13 @@ namespace HTH
         public List<CardDataSO> FieldData => Field.ConvertAll(e => e.data);
 
         // ─── 이벤트 ──────────────────────────────────────────────
-        /// <summary>
-        /// 딜러 필드에 카드가 추가될 때 발행.
-        /// entry : 추가된 카드
-        /// isHidden : 비공개 카드 여부
-        /// GameManager.OnDealerCardAdded가 구독해 UI에 카드 1장만 추가합니다.
-        /// </summary>
+        /// <summary>새 카드가 필드에 추가될 때 발행 → UI 카드 생성</summary>
         public event System.Action<DeckSO.CardEntry, bool> OnDealerCardAdded;
 
+        /// <summary>
+        /// 비공개 카드가 공개될 때 발행 → 기존 뒷면 카드를 SetFaceUp()
+        /// 새 카드를 생성하지 않음
+        /// </summary>
         public event System.Action OnDealerCardRevealed;
 
         /// <summary>딜러 턴이 완전히 종료되면 발행</summary>
@@ -50,32 +54,37 @@ namespace HTH
         public void AddOpenCard(DeckSO.CardEntry entry)
         {
             Field.Add(entry);
-            OnDealerCardAdded?.Invoke(entry, false); // isHidden = false
+            OnDealerCardAdded?.Invoke(entry, false); // isHidden = false → 앞면 생성
         }
 
         /// <summary>딜러 비공개 카드를 설정합니다. UI에는 뒷면으로 표시됩니다.</summary>
         public void SetHiddenCard(DeckSO.CardEntry entry)
         {
             _hiddenCard = entry;
-            OnDealerCardAdded?.Invoke(entry, true); // isHidden = true
+            OnDealerCardAdded?.Invoke(entry, true); // isHidden = true → 뒷면 생성
         }
 
-        /// <summary>비공개 카드를 공개합니다. 딜러 턴 시작 시 호출합니다.</summary>
+        /// <summary>
+        /// 비공개 카드를 공개합니다. 딜러 턴 시작 시 호출합니다.
+        /// OnDealerCardRevealed를 발행해 기존 뒷면 카드를 뒤집습니다.
+        /// 새 카드를 생성하지 않습니다.
+        /// </summary>
         public void RevealHiddenCard()
         {
             if (_hiddenCard == null) return;
             Field.Add(_hiddenCard);
-            OnDealerCardAdded?.Invoke(_hiddenCard, false); // 공개 → isHidden = false
             _hiddenCard = null;
+
+            // ← OnDealerCardAdded가 아닌 OnDealerCardRevealed 발행
+            // UI에서 새 카드 생성 없이 기존 뒷면 카드를 SetFaceUp()으로 처리
+            OnDealerCardRevealed?.Invoke();
         }
 
         // ─── 딜러 턴 ─────────────────────────────────────────────
 
-        public IEnumerator RunTurn(
-            DeckRunner deckRunner,
-            IDealerStrategy dealerStrategy,
-            StageDataSO stage)
+        public IEnumerator RunTurn(DeckRunner deckRunner, IDealerStrategy dealerStrategy, StageDataSO stage)
         {
+            // Stay 후 비공개 카드 공개
             RevealHiddenCard();
             yield return new WaitForSeconds(0.5f);
 
@@ -110,7 +119,7 @@ namespace HTH
                 if (entry.data.cardType == CardType.Number)
                 {
                     Field.Add(entry);
-                    OnDealerCardAdded?.Invoke(entry, false);
+                    OnDealerCardAdded?.Invoke(entry, false); // 새 카드 → 앞면 생성
                     yield return new WaitForSeconds(0.8f);
                 }
                 else if (stage.useOperatorCards)

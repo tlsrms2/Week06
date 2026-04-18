@@ -29,9 +29,9 @@ namespace HTH
 
         // ─── 앞뒤면 각도 ──────────────────────────────────────────
         private static readonly Quaternion FaceUpRotation
-            = Quaternion.Euler(0f, 180f, 0f);
+            = Quaternion.Euler(90f, 90f, 0f);
         private static readonly Quaternion FaceDownRotation
-            = Quaternion.Euler(0f, 0f, 0f);
+            = Quaternion.Euler(-90f, 90f, 0f);
 
         // ─── 생명주기 ─────────────────────────────────────────────
 

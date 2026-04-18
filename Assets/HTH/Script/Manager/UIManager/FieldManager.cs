@@ -9,11 +9,14 @@ namespace HTH
     /// <summary>
     /// 플레이어 필드 / 딜러 필드 / 플레이어 손패를 통합 관리합니다.
     ///
+    /// 카드 정렬
+    /// └── 코드로 직접 계산 (HorizontalLayoutGroup 미사용)
+    ///     카드 추가될 때마다 전체 중앙 정렬 재계산
+    ///     maxCardsPerRow 초과 시 줄바꿈
+    ///
     /// 좌표계 분리
     /// ├── 3D 카드  → _playerFieldAnchor / _dealerFieldAnchor (일반 Transform)
-    /// │   카드 정렬은 외부 HorizontalLayoutGroup이 담당
     /// └── 손패 UI  → _playerHandContainer (Canvas 안 RectTransform)
-    ///     연산자 슬롯 UI도 _playerHandContainer 안에 배치
     /// </summary>
     public class FieldManager : MonoBehaviour
     {
@@ -23,15 +26,25 @@ namespace HTH
         [SerializeField] private GameObject _fieldPanelRoot;
 
         [Header("3D 카드 배치 기준점 (일반 Transform)")]
-        [Tooltip("플레이어 카드 배치 기준점")]
+        [Tooltip("플레이어 카드 배치 기준점 — 이 Transform이 중앙")]
         [SerializeField] private Transform _playerFieldAnchor;
 
-        [Tooltip("딜러 카드 배치 기준점")]
+        [Tooltip("딜러 카드 배치 기준점 — 이 Transform이 중앙")]
         [SerializeField] private Transform _dealerFieldAnchor;
+
+        [Header("카드 정렬 설정")]
+        [Tooltip("카드 가로 간격 (월드 단위)")]
+        [SerializeField] private float _cardSpacingX = 0.15f;
+
+        [Tooltip("카드 세로 간격 — 줄바꿈 시 (월드 단위)")]
+        [SerializeField] private float _cardSpacingY = 0.25f;
+
+        [Tooltip("한 줄에 표시할 최대 카드 수")]
+        [SerializeField] private int _maxCardsPerRow = 5;
 
         [Header("손패 / 연산자 슬롯 UI (Canvas 안 RectTransform)")]
         [Tooltip("플레이어 손패 카드 UI 컨테이너")]
-        [SerializeField] private Transform _playerHandContainer;
+        [SerializeField] private RectTransform _playerHandContainer;
 
         // ─── 의존성 ───────────────────────────────────────────────
         private CardCreateManager _cardCreate;
@@ -64,16 +77,26 @@ namespace HTH
 
         // ─── 플레이어 필드 (3D) ───────────────────────────────────
 
-        /// <summary>플레이어 필드에 3D 카드를 추가합니다.</summary>
+        /// <summary>
+        /// 플레이어 필드에 카드를 추가합니다.
+        /// 추가 후 전체 카드 위치를 중앙 기준으로 재정렬합니다.
+        /// </summary>
         public void AddPlayerFieldCard(DeckSO.CardEntry entry)
         {
             if (entry.data.cardType != CardType.Number) return;
 
+            // 두 번째 카드부터 연산자 슬롯 생성
             if (_playerFieldCards.Count > 0)
                 CreateOperatorSlot(_playerFieldCards.Count - 1);
 
+            // 이 카드의 목표 localPosition 계산
             int index = _playerFieldCards.Count;
-            var view = _cardCreate.CreateFieldCard(_playerFieldAnchor, entry, index);
+            Vector3 targetPos = CalcLocalPos(index, _maxCardsPerRow, _cardSpacingX, _cardSpacingY);
+
+            var view = _cardCreate.CreatePlayerFieldCard(_playerFieldAnchor, entry, targetPos, onArrived: () =>
+            {
+                RealignCards(_playerFieldCards, _maxCardsPerRow, _cardSpacingX, _cardSpacingY);
+            });
 
             if (view == null) return;
 
@@ -169,14 +192,20 @@ namespace HTH
 
         // ─── 딜러 필드 (3D) ──────────────────────────────────────
 
-        /// <summary>딜러 필드에 3D 카드를 추가합니다.</summary>
+        /// <summary>
+        /// 딜러 필드에 카드를 추가합니다.
+        /// 추가 후 전체 카드 위치를 중앙 기준으로 재정렬합니다.
+        /// </summary>
         public void AddDealerFieldCard(DeckSO.CardEntry entry, bool isHidden = false)
         {
             int index = _dealerFieldCards.Count;
+            Vector3 targetPos = CalcLocalPos(index, _maxCardsPerRow, _cardSpacingX, _cardSpacingY);
 
-            var view = isHidden
-                ? _cardCreate.CreateHiddenCard(_dealerFieldAnchor, entry, index)
-                : _cardCreate.CreateFieldCard(_dealerFieldAnchor, entry, index);
+            var view = _cardCreate.CreateDealerFieldCard(
+                _dealerFieldAnchor, entry, targetPos, isHidden, onArrived: () =>
+                {
+                    RealignCards(_dealerFieldCards, _maxCardsPerRow, _cardSpacingX, _cardSpacingY);
+                });
 
             if (view == null) return;
 
@@ -185,6 +214,7 @@ namespace HTH
 
             if (isHidden)
                 _dealerHiddenCardView = view;
+
         }
 
         /// <summary>딜러 비공개 카드를 앞면으로 뒤집습니다.</summary>
@@ -205,6 +235,61 @@ namespace HTH
             _dealerHiddenCardView = null;
         }
 
+        // ─── 정렬 계산 ────────────────────────────────────────────
+
+        /// <summary>
+        /// 인덱스 기준으로 카드의 localPosition을 계산합니다.
+        /// 한 줄 중앙 정렬 + maxCardsPerRow 초과 시 줄바꿈.
+        /// </summary>
+        private Vector3 CalcLocalPos(
+            int index,
+            int maxPerRow,
+            float spacingX,
+            float spacingY)
+        {
+            int row = index / maxPerRow;
+            int col = index % maxPerRow;
+
+            // 이 줄의 카드 수 (마지막 줄은 남은 카드 수)
+            // 전체 카드 기준이 아닌 현재 추가 중이므로 col + 1 기준
+            float x = col * spacingX;
+            float y = -row * spacingY;
+
+            return new Vector3(x, y, 0f);
+        }
+
+        /// <summary>
+        /// 전체 카드를 중앙 기준으로 재정렬합니다.
+        /// 각 줄별로 중앙 오프셋을 계산합니다.
+        /// </summary>
+        private void RealignCards(List<ICardView> cards, int maxPerRow, float spacingX, float spacingY)
+        {
+            int totalCards = cards.Count;
+            if (totalCards == 0) return;
+
+            for (int i = 0; i < totalCards; i++)
+            {
+                if (cards[i] is not MonoBehaviour mb || mb == null) continue;
+
+                int row = i / maxPerRow;
+                int col = i % maxPerRow;
+
+                // 이 줄의 카드 수
+                int rowStart = row * maxPerRow;
+                int rowEnd = Mathf.Min(rowStart + maxPerRow, totalCards);
+                int countInRow = rowEnd - rowStart;
+
+                // 줄 중앙 오프셋
+                float rowWidth = (countInRow - 1) * spacingX;
+                float centerOffX = -rowWidth / 2f;
+
+                float x = centerOffX + col * spacingX;
+                float y = -row * spacingY;
+
+                mb.transform.localPosition = new Vector3(x, y, 0f);
+            }
+        }
+
         // ─── 플레이어 손패 (UI) ───────────────────────────────────
 
         /// <summary>손패에 연산자 카드 UI를 추가합니다.</summary>
@@ -213,7 +298,7 @@ namespace HTH
             int index = _playerHandCards.Count;
             int captured = index;
 
-            var view = _cardCreate.CreateHandCard(_playerHandContainer, entry, index);
+            var view = _cardCreate.CreateHandCard(_playerHandContainer, entry);
             if (view == null) return;
 
             view.SetInteractable(true);

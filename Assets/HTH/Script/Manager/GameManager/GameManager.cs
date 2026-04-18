@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace HTH
@@ -53,6 +54,9 @@ namespace HTH
         private readonly List<DeckSO.CardEntry> _pendingOperators = new();
 
         // ─── 연출 지연 시간 ───────────────────────────────────────
+        [Header("초기 딜링 지연 시간")]
+        [Tooltip("초기 딜링 카드 사이 대기 시간 (초)")]
+        [SerializeField] private float _dealInterval = 0.5f;
         [Header("연출 지연 시간")]
         [SerializeField] private float _bustDelay = 1.5f;
         [SerializeField] private float _standDelay = 1.0f;
@@ -175,10 +179,8 @@ namespace HTH
                 case GameState.Title: OnEnterTitle(); break;
                 case GameState.Betting: OnEnterBetting(); break;
                 case GameState.PlayerTurn: OnEnterPlayerTurn(); break;
-                case GameState.DealerTurn:
-                    StartCoroutine(_dealerManager.RunTurn(
-                        _deckRunner, _dealerStrategy,
-                        _stageManager.CurrentStage)); break;
+                case GameState.DealerTurn: StartCoroutine(_dealerManager.RunTurn(
+                        _deckRunner, _dealerStrategy, _stageManager.CurrentStage)); break;
                 case GameState.Result: OnEnterResult(); break;
                 case GameState.GameOver: OnEnterGameOver(); break;
                 case GameState.StageClear: OnEnterStageClear(); break;
@@ -212,11 +214,11 @@ namespace HTH
             _gameUI?.EnableGameButtons();
             _gameUI?.ClearDealerValue();
 
-            // ← 변경 — Refresh 대신 ClearAllFields 후 초기 딜링
+            // Refresh 대신 ClearAllFields 후 초기 딜링
             // 초기 딜링에서 AddPlayerFieldCard / AddDealerFieldCard가 호출됨
             _gameUI?.ClearAllFields();
 
-            DealInitialCards();
+            StartCoroutine(DealInitialCardsRoutine());
 
             if (_gameUI != null)
             {
@@ -228,38 +230,61 @@ namespace HTH
         }
 
         // ─── 초기 딜링 ────────────────────────────────────────────
-
-        private void DealInitialCards()
+        /// <summary>
+        /// 초기 딜링을 순차적으로 수행합니다.
+        /// 플레이어 1장 → 딜러 1장(공개) → 플레이어 1장 → 딜러 1장(비공개)
+        /// 각 카드 사이에 _dealInterval만큼 대기합니다.
+        /// </summary>
+        private IEnumerator DealInitialCardsRoutine()
         {
-            if (_stageManager.CurrentStage.operatorOnlyHit)
-            {
-                DealAllNumberCards();
-                return;
+            if(_stageManager.CurrentStage.operatorOnlyHit)
+    {
+                yield return StartCoroutine(DealAllNumberCardsRoutine());
+                yield break;
             }
 
+            // 1. 플레이어 첫 번째 카드
             if (_deckRunner.TryDraw(out DeckSO.CardEntry p1))
                 _playerHandManager.AddNumberToField(p1);
 
+            yield return new WaitForSeconds(_dealInterval);
+
+            // 2. 딜러 공개 카드
             if (_deckRunner.TryDraw(out DeckSO.CardEntry d1))
                 _dealerManager.AddOpenCard(d1);
 
+            yield return new WaitForSeconds(_dealInterval);
+
+            // 3. 플레이어 두 번째 카드
             if (_deckRunner.TryDraw(out DeckSO.CardEntry p2))
                 _playerHandManager.AddNumberToField(p2);
 
+            yield return new WaitForSeconds(_dealInterval);
+
+            // 4. 딜러 비공개 카드
             if (_deckRunner.TryDraw(out DeckSO.CardEntry d2))
                 _dealerManager.SetHiddenCard(d2);
         }
 
-        private void DealAllNumberCards()
+        /// <summary>
+        /// operatorOnlyHit 스테이지 전용 초기 딜링.
+        /// 숫자 카드를 하나씩 순차적으로 지급합니다.
+        /// </summary>
+        private IEnumerator DealAllNumberCardsRoutine()
         {
             while (_deckRunner.Remaining > 0)
             {
                 if (!_deckRunner.TryDraw(out DeckSO.CardEntry entry)) break;
 
                 if (entry.data.cardType == CardType.Number)
+                {
                     _playerHandManager.AddNumberToField(entry);
+                    yield return new WaitForSeconds(_dealInterval);
+                }
                 else
+                {
                     _pendingOperators.Add(entry);
+                }
             }
 
             foreach (var op in _pendingOperators)

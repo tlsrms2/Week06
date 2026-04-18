@@ -41,6 +41,9 @@ namespace HTH
         /// <summary>Hit / Stay 버튼 콜백을 등록합니다.</summary>
         public void Setup(Action onHit, Action onStand)
         {
+            SetGameButtonLabel(_hitButton, "HIT");
+            SetGameButtonLabel(_stayButton, "STAY");
+
             _hitButton.onClick.RemoveAllListeners();
             _hitButton.onClick.AddListener(() => onHit?.Invoke());
             _stayButton.onClick.RemoveAllListeners();
@@ -158,19 +161,49 @@ namespace HTH
                 onRestart?.Invoke();
             });
         }
-        public void ShowOperatorChoice(Action onDiscard)
+        public void ShowOperatorChoice()
         {
             _operatorChoicePanel?.SetActive(true);
+            _operatorDiscardButton?.onClick.RemoveAllListeners();
+            if (_operatorDiscardButton != null)
+                _operatorDiscardButton.gameObject.SetActive(false);
+        }
 
-            _operatorDiscardButton.onClick.RemoveAllListeners();
-            _operatorDiscardButton.onClick.AddListener(() =>
-            {
-                _operatorChoicePanel?.SetActive(false);
-                onDiscard?.Invoke();
-            });
+        public void ShowAceChoice(Action onSelectOne, Action onSelectEleven)
+        {
+            SetGameButtonLabel(_hitButton, "A = 1");
+            SetGameButtonLabel(_stayButton, "A = 11");
+
+            _hitButton.onClick.RemoveAllListeners();
+            _hitButton.onClick.AddListener(() => onSelectOne?.Invoke());
+
+            _stayButton.onClick.RemoveAllListeners();
+            _stayButton.onClick.AddListener(() => onSelectEleven?.Invoke());
+
+            EnableButtons();
         }
 
         public void HideOperatorChoice()
-            => _operatorChoicePanel?.SetActive(false);
+        {
+            _operatorChoicePanel?.SetActive(false);
+            if (_operatorDiscardButton != null)
+                _operatorDiscardButton.gameObject.SetActive(true);
+        }
+
+        private void SetGameButtonLabel(Button button, string label)
+        {
+            if (button == null) return;
+
+            var tmp = button.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (tmp != null)
+            {
+                tmp.text = label;
+                return;
+            }
+
+            var legacy = button.GetComponentInChildren<Text>(true);
+            if (legacy != null)
+                legacy.text = label;
+        }
     }
 }

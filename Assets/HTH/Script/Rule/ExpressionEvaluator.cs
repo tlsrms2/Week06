@@ -24,10 +24,10 @@ namespace HTH
         {
             if (expression == null || expression.Count == 0) return 0;
 
-            SplitExpression(expression, out List<long> numbers, out List<OperatorType> operators);
+            SplitExpression(expression, out List<long> numbers, out List<OperatorType> operators, out List<bool> flexibleAces);
 
             long result = useFlexibleAce
-                ? EvaluateWithFlexibleAce(numbers, operators, bustThreshold)
+                ? EvaluateWithFlexibleAce(numbers, operators, flexibleAces, bustThreshold)
                 : EvaluateInfix(numbers, operators);
 
             // 음수 제한
@@ -56,10 +56,15 @@ namespace HTH
 
         // ─── private ─────────────────────────────────────────────
 
-        private static void SplitExpression(List<CardDataSO> expression, out List<long> numbers, out List<OperatorType> operators)
+        private static void SplitExpression(
+            List<CardDataSO> expression,
+            out List<long> numbers,
+            out List<OperatorType> operators,
+            out List<bool> flexibleAces)
         {
             numbers = new List<long>();
             operators = new List<OperatorType>();
+            flexibleAces = new List<bool>();
 
             OperatorType pendingOp = OperatorType.None;
 
@@ -71,6 +76,7 @@ namespace HTH
                         operators.Add(pendingOp);
 
                     numbers.Add(card.BlackjackValue);
+                    flexibleAces.Add(card.IsFlexibleAceCandidate);
                     pendingOp = OperatorType.None;
                 }
                 else
@@ -144,13 +150,18 @@ namespace HTH
         }
 
         /// <summary>FlexibleAce 적용 버전.</summary>
-        private static long EvaluateWithFlexibleAce(List<long> numbers, List<OperatorType> operators, long bustThreshold)
+        private static long EvaluateWithFlexibleAce(
+            List<long> numbers,
+            List<OperatorType> operators,
+            List<bool> flexibleAces,
+            long bustThreshold)
         {
             long baseResult = EvaluateInfix(numbers, operators);
 
             for (int i = 0; i < numbers.Count; i++)
             {
                 if (numbers[i] != 1) continue;
+                if (i >= flexibleAces.Count || !flexibleAces[i]) continue;
 
                 OperatorType op = i == 0
                     ? OperatorType.None

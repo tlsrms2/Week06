@@ -156,10 +156,13 @@ namespace HTH
             => _fieldManager.RevealDealerHiddenCard(onComplete);
 
         /// <summary>
-        /// 연산자 카드 사용/버리기 선택 UI를 표시합니다.
+        /// 연산자 카드 배치 UI를 표시합니다.
         /// </summary>
-        public void ShowOperatorChoice(Action onDiscard)
-            => _gamePanelManager.ShowOperatorChoice(onDiscard);
+        public void ShowOperatorChoice()
+            => _gamePanelManager.ShowOperatorChoice();
+
+        public void ShowAceChoice(Action onSelectOne, Action onSelectEleven)
+            => _gamePanelManager.ShowAceChoice(onSelectOne, onSelectEleven);
 
         public void HideOperatorChoice()
             => _gamePanelManager.HideOperatorChoice();

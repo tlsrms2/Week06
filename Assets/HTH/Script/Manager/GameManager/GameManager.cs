@@ -252,7 +252,10 @@ namespace HTH
 
             // 1. 플레이어 첫 번째 카드
             if (_deckRunner.TryDraw(out DeckSO.CardEntry p1))
+            {
+                yield return StartCoroutine(ResolvePlayerAceChoiceIfNeeded(p1, disableButtonsAfterChoice: true));
                 _playerHandManager.AddNumberToField(p1);
+            }
 
             yield return new WaitForSeconds(_dealInterval);
 
@@ -264,7 +267,10 @@ namespace HTH
 
             // 3. 플레이어 두 번째 카드
             if (_deckRunner.TryDraw(out DeckSO.CardEntry p2))
+            {
+                yield return StartCoroutine(ResolvePlayerAceChoiceIfNeeded(p2, disableButtonsAfterChoice: true));
                 _playerHandManager.AddNumberToField(p2);
+            }
 
             yield return new WaitForSeconds(_dealInterval);
 
@@ -285,6 +291,7 @@ namespace HTH
 
                 if (entry.data.cardType == CardType.Number)
                 {
+                    yield return StartCoroutine(ResolvePlayerAceChoiceIfNeeded(entry, disableButtonsAfterChoice: true));
                     _playerHandManager.AddNumberToField(entry);
                     yield return new WaitForSeconds(_dealInterval);
                 }
@@ -356,9 +363,9 @@ namespace HTH
 
         // ─── 플레이어 액션 ────────────────────────────────────────
 
-        private void OnHit() => DrawAndProcess();
+        private void OnHit() => StartCoroutine(DrawAndProcess());
 
-        private void DrawAndProcess(int retryCount = 0)
+        private IEnumerator DrawAndProcess(int retryCount = 0)
         {
             var stage = _stageManager.CurrentStage;
 
@@ -366,7 +373,7 @@ namespace HTH
             {
                 Debug.Log("[GM] 최대 Hit 횟수 도달 — Stand 전환");
                 OnStand();
-                return;
+                yield break;
             }
 
             if (retryCount > 10)
@@ -374,7 +381,7 @@ namespace HTH
                 Debug.LogWarning("[GM] DrawAndProcess — 재드로우 한도 초과");
                 ExitPlayerTurn();
                 TransitionTo(GameState.DealerTurn);
-                return;
+                yield break;
             }
 
             if (!_deckRunner.TryDraw(out DeckSO.CardEntry entry))
@@ -382,7 +389,7 @@ namespace HTH
                 Debug.Log("[GM] 덱 소진 — 딜러 턴 전환");
                 ExitPlayerTurn();
                 TransitionTo(GameState.DealerTurn);
-                return;
+                yield break;
             }
 
             if (entry.data.cardType == CardType.Number)
@@ -390,23 +397,26 @@ namespace HTH
                 if (stage.operatorOnlyHit)
                 {
                     _deckRunner.ReturnCard(entry);
-                    DrawAndProcess(retryCount + 1);
-                    return;
+                    yield return StartCoroutine(DrawAndProcess(retryCount + 1));
+                    yield break;
                 }
 
                 _hitCount++;
 
-                _playerHandManager.OnFieldChanged -= OnPlayerFieldChanged;
-                _playerHandManager.AddNumberToField(entry);
-
-                // 연산자 카드 확률 판정
-                if (stage.useOperatorCards &&
+                bool shouldDrawOperator =
+                    stage.useOperatorCards &&
                     stage.operatorCardRatio > 0f &&
-                    Random.value < stage.operatorCardRatio)
+                    !_playerHandManager.HasHandCard &&
+                    Random.value < stage.operatorCardRatio;
+
+                // 한 번의 Hit에서는 숫자/연산자 중 한 장만 지급합니다.
+                if (shouldDrawOperator)
                 {
                     var opCards = stage.deck.operatorCards;
                     if (opCards != null && opCards.Count > 0)
                     {
+                        _deckRunner.ReturnCard(entry);
+
                         var opData = opCards[Random.Range(0, opCards.Count)];
                         var opEntry = new DeckSO.CardEntry
                         {
@@ -421,21 +431,19 @@ namespace HTH
                         _gameUI?.DisableGameButtons();
                         _playerHandManager.AddOperatorToHand(opEntry);
 
-                        _gameUI?.ShowOperatorChoice(
-                            onDiscard: () =>
-                            {
-                                _playerHandManager.DiscardLastOperator();
-                                _gameUI?.RemoveHandCard();
-                                _gameUI?.EnableGameButtons();
-                            });
+                        _gameUI?.ShowOperatorChoice();
 
-                        // ← 재구독 후 UI 갱신하고 흐름 중단
-                        _playerHandManager.OnFieldChanged += OnPlayerFieldChanged;
-                        _gameUI?.AddPlayerFieldCard(entry, createSlot: stage.useOperatorCards);
-                        _gameUI?.UpdatePlayerValue(_playerHandManager.FieldData, stage);
-                        return;
+                        if (stage.maxHitCount > 0 && _hitCount >= stage.maxHitCount)
+                            _gameUI?.DisableGameButtons();
+
+                        yield break;
                     }
                 }
+
+                yield return StartCoroutine(ResolvePlayerAceChoiceIfNeeded(entry));
+
+                _playerHandManager.OnFieldChanged -= OnPlayerFieldChanged;
+                _playerHandManager.AddNumberToField(entry);
 
                 // 연산자 카드 없을 때 — 기존 흐름 계속
                 _gameUI?.AddPlayerFieldCard(entry, createSlot: stage.useOperatorCards);
@@ -448,7 +456,7 @@ namespace HTH
                     _playerHandManager.OnFieldChanged += OnPlayerFieldChanged;
                     ExitPlayerTurn();
                     StartCoroutine(DelayedTransition(_bustDelay, GameState.Result));
-                    return;
+                    yield break;
                 }
 
                 _playerHandManager.OnFieldChanged += OnPlayerFieldChanged;
@@ -469,10 +477,53 @@ namespace HTH
                 }
                 else
                 {
-                    DrawAndProcess(retryCount + 1);
+                    yield return StartCoroutine(DrawAndProcess(retryCount + 1));
                 }
             }
         }
+
+        private IEnumerator ResolvePlayerAceChoiceIfNeeded(
+            DeckSO.CardEntry entry,
+            bool disableButtonsAfterChoice = false)
+        {
+            var stage = _stageManager.CurrentStage;
+            if (!NeedsPlayerAceChoice(stage, entry))
+                yield break;
+
+            if (_gameUI == null)
+            {
+                entry.data.SetAceValue(11);
+                yield break;
+            }
+
+            bool resolved = false;
+
+            _gameUI.ShowAceChoice(
+                onSelectOne: () =>
+                {
+                    entry.data.SetAceValue(1);
+                    resolved = true;
+                },
+                onSelectEleven: () =>
+                {
+                    entry.data.SetAceValue(11);
+                    resolved = true;
+                });
+
+            yield return new WaitUntil(() => resolved);
+
+            _gameUI.SetupGameButtons(OnHit, OnStand);
+            if (disableButtonsAfterChoice)
+                _gameUI.DisableGameButtons();
+        }
+
+        private bool NeedsPlayerAceChoice(StageDataSO stage, DeckSO.CardEntry entry)
+            => stage != null
+            && stage.stageIndex >= 2
+            && entry != null
+            && entry.data != null
+            && entry.data.IsAce
+            && !entry.data.HasAceValueOverride;
 
         private void OnStand()
         {

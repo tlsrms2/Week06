@@ -55,14 +55,18 @@ namespace HTH
                 var data = ScriptableObject.CreateInstance<CardDataSO>();
                 data.cardType = CardType.Number;
                 data.numberValue = i;
-                data.displayLabel = i switch
+                if (i == 1)
+                    data.ClearAceValueOverride();
+                else
                 {
-                    1 => "A",
-                    11 => "J",
-                    12 => "Q",
-                    13 => "K",
-                    _ => i.ToString()
-                };
+                    data.displayLabel = i switch
+                    {
+                        11 => "J",
+                        12 => "Q",
+                        13 => "K",
+                        _ => i.ToString()
+                    };
+                }
 
                 result.Add(new CardEntry
                 {

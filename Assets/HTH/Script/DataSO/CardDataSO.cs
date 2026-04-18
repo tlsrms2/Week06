@@ -17,6 +17,7 @@ namespace HTH
         public int numberValue;
         public OperatorType operatorType;
         public string displayLabel;
+        [SerializeField] private int _aceValueOverride;
 
         [Header("연산자 카드 비주얼 (Operator 전용)")]
         [Tooltip("연산자 카드 프리팹 (Joker 프리팹)")]
@@ -33,7 +34,30 @@ namespace HTH
 
         // ─── 유틸 프로퍼티 ───────────────────────────────────────
 
-        public int BlackjackValue => numberValue > 10 ? 10 : numberValue;
+        public bool IsAce => cardType == CardType.Number && numberValue == 1;
+        public bool HasAceValueOverride => IsAce && (_aceValueOverride == 1 || _aceValueOverride == 11);
+        public bool IsFlexibleAceCandidate => IsAce && !HasAceValueOverride;
+
+        public int BlackjackValue
+            => HasAceValueOverride
+                ? _aceValueOverride
+                : numberValue > 10 ? 10 : numberValue;
+
+        public void SetAceValue(int value)
+        {
+            if (!IsAce) return;
+
+            _aceValueOverride = value == 11 ? 11 : 1;
+            displayLabel = _aceValueOverride == 11 ? "A(11)" : "A(1)";
+        }
+
+        public void ClearAceValueOverride()
+        {
+            if (!IsAce) return;
+
+            _aceValueOverride = 0;
+            displayLabel = "A";
+        }
 
 #if UNITY_EDITOR
         private void OnValidate()

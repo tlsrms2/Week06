@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Stage02
   m_EditorClassIdentifier: Assembly-CSharp::HTH.StageDataSO
   stageIndex: 2
-  bustValue: 50
+  bustValue: 1
   maxHitCount: 0
   deck: {fileID: 11400000, guid: a4f839fa04da59f4aa7bf83bf4f395a9, type: 2}
   operatorCardRatio: 1

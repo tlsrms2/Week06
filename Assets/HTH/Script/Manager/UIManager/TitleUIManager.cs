@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
+using Unity.Cinemachine;
+using System;
 
 namespace HTH
 {
@@ -12,6 +14,15 @@ namespace HTH
         [SerializeField] private Button _startButton;
         [SerializeField] private Button _quitButton;
 
+        [Header("Title UI Panels")]
+        [SerializeField] private GameObject _titleContent; // 타이틀 텍스트와 버튼들이 담긴 루트 오브젝트
+
+        [Header("Cameras")]
+        [SerializeField] private CinemachineCamera _titleCamera;
+        [SerializeField] private CinemachineCamera _gameCamera;
+
+        private Action _onStartCallback;
+
         private void Start()
         {
             if (_startButton != null)
@@ -21,17 +32,42 @@ namespace HTH
                 _quitButton.onClick.AddListener(OnQuitButtonClicked);
         }
 
+        /// <summary>
+        /// GameManager에서 타이틀 화면을 세팅할 때 호출합니다.
+        /// </summary>
+        public void Setup(Action onStart)
+        {
+            _onStartCallback = onStart;
+            if (_titleContent != null)
+                _titleContent.SetActive(true);
+        }
+
         private void OnStartButtonClicked()
         {
-            Debug.Log("[Title] Start Button Clicked. Loading Game Scene...");
-            if (SceneLoadManager.Instance != null)
+            Debug.Log("[Title] Start Button Clicked. Transitioning to Game...");
+            
+            // 1. 타이틀 UI 숨기기
+            if (_titleContent != null)
+                _titleContent.SetActive(false);
+
+            // 2. SceneLoadManager를 통해 카메라 트랜지션 실행
+            if (SceneLoadManager.Instance != null && _titleCamera != null && _gameCamera != null)
             {
-                SceneLoadManager.Instance.LoadGame();
+                SceneLoadManager.Instance.StartGameWithCameraTransition(_titleCamera, _gameCamera, () =>
+                {
+                    Debug.Log("[Title] Transition Complete. Invoking Game Start Callback...");
+                    _onStartCallback?.Invoke();
+                });
             }
             else
             {
-                // SceneLoadManager가 씬에 없을 경우를 대비한 직접 로드
-                UnityEngine.SceneManagement.SceneManager.LoadScene("InGameScene");
+                // 트랜지션 환경이 아닐 경우 기존처럼 씬 로드
+                if (SceneLoadManager.Instance != null)
+                    SceneLoadManager.Instance.LoadGame();
+                else
+                    UnityEngine.SceneManagement.SceneManager.LoadScene("InGameScene");
+
+                _onStartCallback?.Invoke();
             }
         }
 

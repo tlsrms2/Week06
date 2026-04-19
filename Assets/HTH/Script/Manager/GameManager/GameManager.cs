@@ -205,7 +205,11 @@ namespace HTH
 
         // ─── UI 호출 관련 ──────────────────────────────────────────
 
-        private void UI_ShowTitle(System.Action onStart) => onStart?.Invoke();
+        private void UI_ShowTitle(System.Action onStart)
+        {
+            if (_gameUI != null) _gameUI.SetupTitle(onStart);
+            else onStart?.Invoke();
+        }
 
         private void UI_ShowBetting(int min, int max, System.Action<int> onConfirm)
         {

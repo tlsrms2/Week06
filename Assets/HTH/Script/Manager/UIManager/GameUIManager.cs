@@ -18,6 +18,7 @@ namespace HTH
         [SerializeField] private VisionBettingManager _visionBettingManager;
         [SerializeField] private CardCreateManager _cardCreateManager;
         [SerializeField] private GamePanelManager _gamePanelManager;
+        [SerializeField] private TitleUIManager _titleUI;
 
         // ─── 이벤트 허브 ──────────────────────────────────────────────
         /// <summary>손패 카드 클릭 시 발행</summary>
@@ -38,7 +39,16 @@ namespace HTH
                 idx => OnOperatorDropped?.Invoke(idx);
         }
 
-        // ─── HUD ─────────────────────────────────────────────────
+        // ─── 타이틀 ───────────────────────────────────────────────
+
+        /// <summary>타이틀 UI를 세팅하고 시작 콜백을 등록합니다.</summary>
+        public void SetupTitle(Action onStart)
+        {
+            if (_titleUI != null)
+                _titleUI.Setup(onStart);
+            else
+                onStart?.Invoke();
+        }
 
         /// <summary>스테이지 정보를 갱신합니다.</summary>
         public void SetStageInfo(int stageIndex, long bustValue)

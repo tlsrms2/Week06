@@ -36,6 +36,23 @@ namespace HTH
         /// <summary>손패에 카드가 있는지 여부</summary>
         public bool HasHandCard => Hand.Count > 0;
 
+        /// <summary>새 연산자 카드를 받을 수 있는지 여부</summary>
+        public bool CanReceiveOperatorCard
+        {
+            get
+            {
+                if (HasHandCard) return false;
+
+                int numberCount = 0;
+                foreach (var entry in Field)
+                    if (entry.data.cardType == CardType.Number)
+                        numberCount++;
+
+                int availableSlotCount = numberCount - 1 - _placedOperators.Count;
+                return availableSlotCount > 0;
+            }
+        }
+
         /// <summary>현재 선택 인덱스 (-1 = 미선택)</summary>
         public int SelectedHandIndex => _isHandSelected ? 0 : -1;
 

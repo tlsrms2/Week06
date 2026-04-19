@@ -41,6 +41,9 @@ namespace HTH
         /// <summary>Hit / Stay 버튼 콜백을 등록합니다.</summary>
         public void Setup(Action onHit, Action onStand)
         {
+            SetGameButtonLabel(_hitButton, "HIT");
+            SetGameButtonLabel(_stayButton, "STAY");
+
             _hitButton.onClick.RemoveAllListeners();
             _hitButton.onClick.AddListener(() => onHit?.Invoke());
             _stayButton.onClick.RemoveAllListeners();
@@ -62,60 +65,6 @@ namespace HTH
         }
 
         // ─── Result 패널 ──────────────────────────────────────────
-
-        /// <summary>
-        /// Result 패널을 표시합니다.
-        /// win = true면 다음 스테이지, false면 재도전 버튼을 표시합니다.
-        /// </summary>
-        public void ShowResult(
-            string description,
-            bool win,
-            Action onNext)
-        {
-            _resultPanel?.SetActive(true);
-
-            _resultTitleText.text = win ? "S U C C E S S" : "B U S T !";
-            _resultTitleText.color = win
-                ? UIColor.Hex("#4CAF50")
-                : UIColor.Hex("#F44336");
-
-            _resultExprText.text = description;
-            _resultNextButtonLabel.text = win ? "다음 스테이지" : "재  도  전";
-
-            _resultNextButton.onClick.RemoveAllListeners();
-            _resultNextButton.onClick.AddListener(() =>
-            {
-                _resultPanel?.SetActive(false);
-                onNext?.Invoke();
-            });
-        }
-
-        /// <summary>결과 비교 텍스트를 갱신합니다.</summary>
-        public void SetResultCompare(
-            long playerTotal,
-            long dealerTotal,
-            long bustValue,
-            bool win)
-        {
-            if (_resultCompareText == null) return;
-
-            long playerDiff = Mathf.Abs((int)(bustValue - playerTotal));
-            long dealerDiff = Mathf.Abs((int)(bustValue - dealerTotal));
-
-            _resultCompareText.text = win
-                ? $"플레이어 {playerTotal:N0} (차이:{playerDiff}) " +
-                  $"vs 딜러 {dealerTotal:N0} (차이:{dealerDiff})"
-                : $"플레이어 {playerTotal:N0} (차이:{playerDiff}) " +
-                  $"vs 딜러 {dealerTotal:N0} (차이:{dealerDiff})";
-
-            _resultCompareText.color = win
-                ? UIColor.Hex("#FFD700")
-                : UIColor.Hex("#F44336");
-        }
-
-        /// <summary>Result 패널을 닫습니다.</summary>
-        public void HideResult()
-            => _resultPanel?.SetActive(false);
 
         // ─── GameOver 패널 ────────────────────────────────────────
 
@@ -158,19 +107,49 @@ namespace HTH
                 onRestart?.Invoke();
             });
         }
-        public void ShowOperatorChoice(Action onDiscard)
+        public void ShowOperatorChoice()
         {
             _operatorChoicePanel?.SetActive(true);
+            _operatorDiscardButton?.onClick.RemoveAllListeners();
+            if (_operatorDiscardButton != null)
+                _operatorDiscardButton.gameObject.SetActive(false);
+        }
 
-            _operatorDiscardButton.onClick.RemoveAllListeners();
-            _operatorDiscardButton.onClick.AddListener(() =>
-            {
-                _operatorChoicePanel?.SetActive(false);
-                onDiscard?.Invoke();
-            });
+        public void ShowAceChoice(Action onSelectOne, Action onSelectEleven)
+        {
+            SetGameButtonLabel(_hitButton, "A = 1");
+            SetGameButtonLabel(_stayButton, "A = 11");
+
+            _hitButton.onClick.RemoveAllListeners();
+            _hitButton.onClick.AddListener(() => onSelectOne?.Invoke());
+
+            _stayButton.onClick.RemoveAllListeners();
+            _stayButton.onClick.AddListener(() => onSelectEleven?.Invoke());
+
+            EnableButtons();
         }
 
         public void HideOperatorChoice()
-            => _operatorChoicePanel?.SetActive(false);
+        {
+            _operatorChoicePanel?.SetActive(false);
+            if (_operatorDiscardButton != null)
+                _operatorDiscardButton.gameObject.SetActive(true);
+        }
+
+        private void SetGameButtonLabel(Button button, string label)
+        {
+            if (button == null) return;
+
+            var tmp = button.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (tmp != null)
+            {
+                tmp.text = label;
+                return;
+            }
+
+            var legacy = button.GetComponentInChildren<Text>(true);
+            if (legacy != null)
+                legacy.text = label;
+        }
     }
 }

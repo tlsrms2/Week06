@@ -60,21 +60,9 @@ namespace HTH
         /// </summary>
         public bool IsPlayerBust(List<CardDataSO> field, StageDataSO stage)
         {
-            // 연산자 스테이지 — 연산자 미배치 시 스킵
-            if (stage.useOperatorCards && !HasOperatorPlaced(field))
-                return false;
-
             long total = EvaluatePlayer(field, stage);
 
-            // 연산자 스테이지이고 손패에 연산자가 있으면 스킵
-            // → GameManager에서 hand 정보를 넘겨줘야 하므로
-            //    여기서는 필드에 연산자가 없을 때만 체크
-            if (stage.useOperatorCards && !HasOperatorPlaced(field))
-                return false;
-
-            return stage.normalJudge
-                ? total > stage.bustValue   // 기본 — 초과면 버스트
-                : total < stage.bustValue;  // 리버스 — 미만이면 버스트
+            return total > stage.bustValue;
         }
         /// <summary>
         /// Stay 후 최종 버스트 여부를 확인합니다.
@@ -83,19 +71,7 @@ namespace HTH
         {
             long total = EvaluatePlayer(field, stage);
 
-            return stage.normalJudge
-                ? total > stage.bustValue   // 기본 — 초과면 버스트
-                : total < stage.bustValue;  // 리버스 — 미만이면 버스트
-        }
-
-        /// <summary>
-        /// Field에 연산자 카드가 배치되어 있는지 확인합니다.
-        /// </summary>
-        private bool HasOperatorPlaced(List<CardDataSO> field)
-        {
-            foreach (var card in field)
-                if (card.cardType == CardType.Operator) return true;
-            return false;
+            return total > stage.bustValue;
         }
 
         // ─── 승패 판정 ────────────────────────────────────────────
@@ -117,60 +93,27 @@ namespace HTH
         /// </summary>
         public bool JudgeResult(long playerTotal, long dealerTotal, StageDataSO stage)
         {
-            if (stage.normalJudge)
-            {
-                // 기본 판별식
-                if (playerTotal > stage.bustValue) return false; // 플레이어 버스트
-                if (dealerTotal > stage.bustValue) return true;  // 딜러 버스트
+            if (playerTotal > stage.bustValue) return false;
+            if (dealerTotal > stage.bustValue) return true;
 
-                // bustValue에 더 근접한 쪽 승리
-                long playerDiff = stage.bustValue - playerTotal;
-                long dealerDiff = stage.bustValue - dealerTotal;
+            long playerDiff = stage.bustValue - playerTotal;
+            long dealerDiff = stage.bustValue - dealerTotal;
 
-                if (playerDiff < dealerDiff) return true;
-                if (playerDiff > dealerDiff) return false;
-                return false; // 동점 → 패배
-            }
-            else
-            {
-                // 리버스 판별식
-                if (playerTotal < stage.bustValue) return false; // 플레이어 버스트
-                if (dealerTotal < stage.bustValue) return true;  // 딜러 버스트
-
-                // bustValue에 더 근접한 쪽 승리 (아래에서 접근)
-                long playerDiff = playerTotal - stage.bustValue;
-                long dealerDiff = dealerTotal - stage.bustValue;
-
-                if (playerDiff < dealerDiff) return true;
-                if (playerDiff > dealerDiff) return false;
-                return false; // 동점 → 패배
-            }
+            if (playerDiff < dealerDiff) return true;
+            if (playerDiff > dealerDiff) return false;
+            return false;
         }
 
         /// <summary>결과 설명 문자열을 생성합니다.</summary>
         public string BuildResultDescription(long playerTotal, long dealerTotal, StageDataSO stage, bool win)
         {
-            if (stage.normalJudge)
-            {
-                if (playerTotal > stage.bustValue)
-                    return $"버스트! {playerTotal:N0} > {stage.bustValue:N0}";
-                if (dealerTotal > stage.bustValue)
-                    return $"딜러 버스트! 딜러: {dealerTotal:N0}";
-            }
-            else
-            {
-                if (playerTotal < stage.bustValue)
-                    return $"버스트! {playerTotal:N0} < {stage.bustValue:N0}";
-                if (dealerTotal < stage.bustValue)
-                    return $"딜러 버스트! 딜러: {dealerTotal:N0}";
-            }
+            if (playerTotal > stage.bustValue)
+                return $"버스트! {playerTotal:N0} > {stage.bustValue:N0}";
+            if (dealerTotal > stage.bustValue)
+                return $"딜러 버스트! 딜러: {dealerTotal:N0}";
 
-            long playerDiff = stage.normalJudge
-                ? stage.bustValue - playerTotal
-                : playerTotal - stage.bustValue;
-            long dealerDiff = stage.normalJudge
-                ? stage.bustValue - dealerTotal
-                : dealerTotal - stage.bustValue;
+            long playerDiff = stage.bustValue - playerTotal;
+            long dealerDiff = stage.bustValue - dealerTotal;
 
             if (playerDiff == dealerDiff)
                 return $"무승부. 둘 다 {stage.bustValue:N0}까지 {playerDiff:N0} 차이";

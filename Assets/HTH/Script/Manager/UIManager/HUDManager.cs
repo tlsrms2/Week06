@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -58,7 +58,7 @@ namespace HTH
 
         /// <summary>
         /// 플레이어 현재 값을 갱신합니다.
-        /// normalJudge / reverseJudge에 따라 색상을 분기합니다.
+        /// 1Stage와 동일하게 bustValue 초과 기준으로 색상을 분기합니다.
         /// </summary>
         public void UpdatePlayerValue(
             List<CardDataSO> field,
@@ -68,7 +68,7 @@ namespace HTH
 
             if (field == null || field.Count == 0)
             {
-                _playerValueText.text = "= 0";
+                _playerValueText.text = "0";
                 _playerValueText.color = ColorDefault;
                 return;
             }
@@ -79,7 +79,7 @@ namespace HTH
                 stage.bustValue,
                 stage.allowNegative);
 
-            _playerValueText.text = $"= {value:N0}";
+            _playerValueText.text = $"{value:N0}";
             _playerValueText.color = GetValueColor(value, stage);
         }
 
@@ -95,7 +95,7 @@ namespace HTH
 
             if (field == null || field.Count == 0)
             {
-                _dealerValueText.text = "—";
+                _dealerValueText.text = "0";
                 _dealerValueText.color = ColorDefault;
                 return;
             }
@@ -106,7 +106,7 @@ namespace HTH
                 stage.bustValue,
                 stage.allowNegative);
 
-            _dealerValueText.text = $"딜러: {value:N0}";
+            _dealerValueText.text = $"{value:N0}";
             _dealerValueText.color = GetValueColor(value, stage);
         }
 
@@ -114,43 +114,35 @@ namespace HTH
         public void ClearDealerValue()
         {
             if (_dealerValueText == null) return;
-            _dealerValueText.text = "—";
+            _dealerValueText.text = "0";
             _dealerValueText.color = ColorDefault;
+        }
+
+        /// <summary>플레이어 값 텍스트를 초기화합니다.</summary>
+        public void ClearPlayerValue()
+        {
+            if (_playerValueText == null) return;
+            _playerValueText.text = "0";
+            _playerValueText.color = ColorDefault;
         }
 
         // ─── 색상 판정 ────────────────────────────────────────────
 
         /// <summary>
         /// 값에 따른 색상을 반환합니다.
-        /// normalJudge  : bustValue 초과→붉은색 / 80%이상→노란색 / 일치→녹색
-        /// reverseJudge : bustValue 미만→붉은색 / 120%이하→노란색 / 일치→녹색
+        /// 1Stage와 동일하게 bustValue 초과→붉은색 / 80%이상→노란색 / 일치→녹색
         /// </summary>
         private Color GetValueColor(long value, StageDataSO stage)
         {
             long bustValue = stage.bustValue;
 
-            if (stage.normalJudge)
-            {
-                // 기본 판별 — bustValue 이하가 목표
-                if (value > bustValue)
-                    return ColorBust;                          // 초과 — 버스트
-                if (value == bustValue)
-                    return ColorExact;                         // 일치
-                if (value >= (long)(bustValue * 0.8f))
-                    return ColorClose;                         // 80% 이상 근접
-                return ColorDefault;                           // 여유
-            }
-            else
-            {
-                // 리버스 판별 — bustValue 이상이 목표
-                if (value < bustValue)
-                    return ColorBust;                          // 미만 — 버스트
-                if (value == bustValue)
-                    return ColorExact;                         // 일치
-                if (value <= (long)(bustValue * 1.2f))
-                    return ColorClose;                         // 120% 이하 근접
-                return ColorDefault;                           // 여유
-            }
+            if (value > bustValue)
+                return ColorBust;
+            if (value == bustValue)
+                return ColorExact;
+            if (value >= (long)(bustValue * 0.8f))
+                return ColorClose;
+            return ColorDefault;
         }
     }
 }

@@ -75,15 +75,18 @@ Assets/HTH/Script/
   GameManager.cs
   PlayerHandManager.cs
   StageManager.cs
- Manager/UIManager/
-  CardCreateManager.cs
-  FieldManager.cs
-  GamePanelManager.cs
-  GameUIManager.cs
-  HUDManager.cs
-  ResultPanelManager.cs
-  VisionBettingManager.cs
- Manager/VisionManager.cs
+ Manager/
+  SceneLoadManager.cs
+  UIManager/
+   CardCreateManager.cs
+   FieldManager.cs
+   GamePanelManager.cs
+   GameUIManager.cs
+   HUDManager.cs
+   ResultPanelManager.cs
+   TitleUIManager.cs
+   VisionBettingManager.cs
+  VisionManager.cs
  Rule/
   ExpressionEvaluator.cs
   OperatorSlot3D.cs

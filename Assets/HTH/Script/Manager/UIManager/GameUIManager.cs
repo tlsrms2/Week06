@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -19,23 +19,23 @@ namespace HTH
         [SerializeField] private CardCreateManager _cardCreateManager;
         [SerializeField] private GamePanelManager _gamePanelManager;
 
-        // ─── 이벤트 허브 ─────────────────────────────────────────
-        /// <summary>연산자 슬롯 클릭 시 발행</summary>
-        public event Action<int> OnOperatorSlotClicked;
-
+        // ─── 이벤트 허브 ──────────────────────────────────────────────
         /// <summary>손패 카드 클릭 시 발행</summary>
         public event Action<int> OnHandCardClicked;
 
-        // ─── 생명주기 ─────────────────────────────────────────────
+        /// <summary>조커 드래그 드롭 시 슬롯 인덱스 발행</summary>
+        public event Action<int> OnOperatorDropped;
+
+        // ─── 생명주기 ──────────────────────────────────────────────────
 
         private void Awake()
         {
             _fieldManager.Initialize(_cardCreateManager);
 
-            _fieldManager.OnOperatorSlotClicked +=
-                idx => OnOperatorSlotClicked?.Invoke(idx);
             _fieldManager.OnHandCardClicked +=
                 idx => OnHandCardClicked?.Invoke(idx);
+            _fieldManager.OnOperatorDropped +=
+                idx => OnOperatorDropped?.Invoke(idx);
         }
 
         // ─── HUD ─────────────────────────────────────────────────
@@ -56,13 +56,17 @@ namespace HTH
         public void ClearDealerValue()
             => _hudManager.ClearDealerValue();
 
+        /// <summary>플레이어 값 텍스트를 초기화합니다.</summary>
+        public void ClearPlayerValue()
+            => _hudManager.ClearPlayerValue();
+
         // ─── 배팅 ────────────────────────────────────────────────
 
         /// <summary>
         /// 배팅 패널을 초기화하고 엽니다.
         /// Confirm 시 FieldManager 활성화 후 onConfirm 호출합니다.
         /// </summary>
-        public void SetupBetting(int betMin, int betMax, Action<int> onConfirm)
+        public void SetupBetting(int betMin, int betMax, int currentVision, int stageIndex, long bustValue, Action<int> onConfirm)
         {
             // 필드 초기화 및 숨김
             _fieldManager.ClearAll();
@@ -71,7 +75,7 @@ namespace HTH
             // HUD 초기화
             _hudManager.ClearDealerValue();
 
-            _visionBettingManager.Setup(betMin, betMax, betAmount =>
+            _visionBettingManager.Setup(betMin, betMax, currentVision, stageIndex, bustValue, betAmount =>
             {
                 _fieldManager.Show();
                 onConfirm?.Invoke(betAmount);
@@ -97,20 +101,6 @@ namespace HTH
 
         // ─── Result / GameOver ────────────────────────────────────
 
-        /// <summary>Result 패널을 표시합니다.</summary>
-        public void ShowResult(
-            string description,
-            bool win,
-            long playerTotal,
-            long dealerTotal,
-            long bustValue,
-            Action onNext)
-        {
-            _gamePanelManager.ShowResult(description, win, onNext);
-            _gamePanelManager.SetResultCompare(
-                playerTotal, dealerTotal, bustValue, win);
-        }
-
         /// <summary>게임 오버 패널을 표시합니다.</summary>
         public void ShowGameOver(Action onRestart)
             => _gamePanelManager.ShowGameOver(onRestart);
@@ -129,6 +119,10 @@ namespace HTH
         public void AddDealerFieldCard(DeckSO.CardEntry entry, bool isHidden = false)
             => _fieldManager.AddDealerFieldCard(entry, isHidden);
 
+        /// <summary>딜러 필드의 지정된 위치에 카드를 삽입합니다.</summary>
+        public void InsertDealerFieldCard(int index, DeckSO.CardEntry entry)
+            => _fieldManager.InsertDealerFieldCard(index, entry);
+
         /// <summary>손패에 카드 1장을 추가합니다.</summary>
         public void AddHandCard(DeckSO.CardEntry entry)
             => _fieldManager.AddHandCard(entry);
@@ -146,6 +140,14 @@ namespace HTH
         /// <summary>슬롯 하이라이트를 갱신합니다.</summary>
         public void HighlightAvailableSlots(bool highlight)
             => _fieldManager.HighlightAvailableSlots(highlight);
+
+        /// <summary>손패의 조커 카드에 드래그 이벤트를 활성화합니다.</summary>
+        public void EnableHandCardDrag()
+            => _fieldManager.EnableHandCardDrag();
+
+        /// <summary>손패의 조커 카드 드래그 이벤트를 비활성화합니다.</summary>
+        public void DisableHandCardDrag()
+            => _fieldManager.DisableHandCardDrag();
 
         /// <summary>손패 카드 선택 상태를 갱신합니다.</summary>
         public void HighlightHandCard(int index)

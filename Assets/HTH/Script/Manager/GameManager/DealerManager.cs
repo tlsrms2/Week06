@@ -16,11 +16,24 @@ namespace HTH
     public class DealerManager : MonoBehaviour
     {
         // ─── 상태 ─────────────────────────────────────────────────
+        [Header("딜러 연출 설정")]
+        [Tooltip("딜러가 다음 행동을 결정하기 전 기본 대기 시간")]
+        [SerializeField] private float _dealerThinkInterval = 0.5f;
+        [Tooltip("딜러가 카드를 뽑고 필드에 추가한 뒤의 대기 시간")]
+        [SerializeField] private float _dealerDrawInterval = 0.8f;
+
         public List<DeckSO.CardEntry> Field { get; private set; } = new();
         public List<DeckSO.CardEntry> Hand  { get; private set; } = new();
 
         public bool HasHiddenCard => _hiddenCard != null;
         private DeckSO.CardEntry _hiddenCard;
+
+        // ─── 확장성 (대사/연출) ──────────────────────────────────
+        /// <summary>
+        /// 딜러가 행동(드로우 등)을 취하기 전에 실행할 커스텀 코루틴 훅입니다.
+        /// 외부(예: 대사 시스템)에서 딜러 턴 도중 대사를 넣고 싶을 때 활용합니다.
+        /// </summary>
+        public System.Func<IEnumerator> BeforeDealerActionHook;
 
         // ─── 변환 헬퍼 ───────────────────────────────────────────
         public List<CardDataSO> FieldData => Field.ConvertAll(e => e.data);
@@ -29,15 +42,17 @@ namespace HTH
         /// <summary>새 카드가 필드에 추가될 때 발행 (entry, isHidden)</summary>
         public event System.Action<DeckSO.CardEntry, bool> OnDealerCardAdded;
 
-        /// <summary>
-        /// 비공개 카드 공개 요청.
+        /// <summary>비공개 카드 공개 요청.
         /// Action 콜백 = 뒤집기 완료 후 호출할 함수 (RunTurn 재개용)
         /// </summary>
         public event System.Action<System.Action> OnDealerCardRevealed;
 
+        /// <summary>딜러 연산자 카드가 특정 위치에 배치되었을 때 발행 (insertIndex, entry)</summary>
+        public event System.Action<int, DeckSO.CardEntry> OnDealerOperatorPlaced;
+
         /// <summary>딜러 턴이 완전히 종료되면 발행</summary>
         public event System.Action OnDealerTurnEnded;
-
+        
         // ─── 초기화 ───────────────────────────────────────────────
 
         public void ResetField()
@@ -102,7 +117,12 @@ namespace HTH
             RevealHiddenCard(onComplete: () => revealed = true);
 
             yield return new WaitUntil(() => revealed);
-            yield return new WaitForSeconds(0.3f);
+            
+            // 확장성: 첫 행동 전 커스텀 연출 대기
+            if (BeforeDealerActionHook != null)
+                yield return StartCoroutine(BeforeDealerActionHook.Invoke());
+            
+            yield return new WaitForSeconds(_dealerThinkInterval);
 
             // 딜러 카드 드로우 루프
             while (true)
@@ -130,6 +150,13 @@ namespace HTH
                     break;
                 }
 
+                // 확장성: 드로우 행동 전 커스텀 연출(대사 등) 대기
+                if (BeforeDealerActionHook != null)
+                    yield return StartCoroutine(BeforeDealerActionHook.Invoke());
+                
+                // 사고 시간 대기
+                yield return new WaitForSeconds(_dealerThinkInterval);
+
                 // 4. 카드 드로우
                 if (!deckRunner.TryDraw(out DeckSO.CardEntry entry))
                 {
@@ -137,16 +164,34 @@ namespace HTH
                     break;
                 }
 
-                if (entry.data.cardType == CardType.Number)
+                // 플레이어와 동일한 확률 판정으로 연산자 카드 지급
+                bool shouldSwapToOperator = stage.useOperatorCards && 
+                                            stage.operatorCardRatio > 0f &&
+                                            UnityEngine.Random.value < stage.operatorCardRatio;
+
+                if (shouldSwapToOperator && stage.deck.operatorCards.Count > 0)
                 {
+                    // 숫자 카드는 덱에 반환하고 연산자 카드로 교체
+                    deckRunner.ReturnCard(entry);
+
+                    var opData = stage.deck.operatorCards[UnityEngine.Random.Range(0, stage.deck.operatorCards.Count)];
+                    var opEntry = new DeckSO.CardEntry
+                    {
+                        data = opData,
+                        suit = CardSuit.Spade,
+                        suitData = null
+                    };
+
+                    Hand.Add(opEntry);
+                    Debug.Log($"[Dealer] 연산자 드로우 성공: {opData.displayLabel} (확률:{stage.operatorCardRatio:P0})");
+                    yield return new WaitForSeconds(_dealerDrawInterval);
+                }
+                else
+                {
+                    // 일반 숫자 카드 처리
                     Field.Add(entry);
                     OnDealerCardAdded?.Invoke(entry, false);
-                    yield return new WaitForSeconds(0.8f);
-                }
-                else if (stage.useOperatorCards)
-                {
-                    Hand.Add(entry);
-                    yield return new WaitForSeconds(0.3f);
+                    yield return new WaitForSeconds(_dealerDrawInterval);
                 }
             }
 
@@ -312,6 +357,7 @@ namespace HTH
             }
 
             Field.Insert(insertPos, op);
+            OnDealerOperatorPlaced?.Invoke(insertPos, op);
         }
     }
 }

@@ -16,7 +16,8 @@ MonoBehaviour:
   numberValue: 0
   operatorType: 3
   displayLabel: "\xF7"
-  jokerPrefab: {fileID: 8986105383121847234, guid: 0a6bbdc705f019844a5c0581e0c50994, type: 3}
+  _aceValueOverride: 0
+  jokerPrefab: {fileID: 4189771964982811416, guid: 82264ecc5854ae845a6706ec7acb6d07, type: 3}
   operatorUvOffset: {x: 0, y: 0}
   operatorMaterial: {fileID: 2100000, guid: acee5651fa8f28a4a93d6f83dc387a45, type: 2}
   operatorUvScale: {x: 1, y: 1}

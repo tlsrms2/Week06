@@ -19,4 +19,3 @@ MonoBehaviour:
   diamond: {fileID: 11400000, guid: 2a78b9d6c3680904191e1d2855a7ce10, type: 2}
   operatorCards:
   - {fileID: 11400000, guid: 57f98657d9850e7498711d95f4c472d7, type: 2}
-  - {fileID: 11400000, guid: 1c252d4cf223aad4a8c110fe76eba6f2, type: 2}

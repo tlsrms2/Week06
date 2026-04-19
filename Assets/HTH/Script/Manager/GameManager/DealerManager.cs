@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -17,7 +17,7 @@ namespace HTH
     {
         // ─── 상태 ─────────────────────────────────────────────────
         public List<DeckSO.CardEntry> Field { get; private set; } = new();
-        public List<DeckSO.CardEntry> Hand { get; private set; } = new();
+        public List<DeckSO.CardEntry> Hand  { get; private set; } = new();
 
         public bool HasHiddenCard => _hiddenCard != null;
         private DeckSO.CardEntry _hiddenCard;
@@ -76,7 +76,6 @@ namespace HTH
             Field.Add(_hiddenCard);
             _hiddenCard = null;
 
-            // FieldManager가 애니메이션 처리 후 onComplete 호출
             OnDealerCardRevealed?.Invoke(onComplete);
         }
 
@@ -85,6 +84,13 @@ namespace HTH
         /// <summary>
         /// 딜러 턴을 실행합니다.
         /// 비공개 카드 뒤집기 애니메이션 완료 후 카드 드로우를 시작합니다.
+        ///
+        /// 드로우 루프 흐름 (스펙 반영)
+        ///  1) 손패의 연산자를 Brute-Force로 최적 슬롯에 먼저 배치
+        ///  2) 현재 점수 계산 → 버스트 시 종료
+        ///  3) ShouldHit (동적 standThreshold) → false 면 스탠드
+        ///  4) 카드 드로우 → 숫자면 필드, 연산자면 손패
+        ///  5) 1로 돌아가 반복
         /// </summary>
         public IEnumerator RunTurn(
             DeckRunner deckRunner,
@@ -95,16 +101,17 @@ namespace HTH
             bool revealed = false;
             RevealHiddenCard(onComplete: () => revealed = true);
 
-            // 뒤집기 완료까지 대기
             yield return new WaitUntil(() => revealed);
             yield return new WaitForSeconds(0.3f);
 
             // 딜러 카드 드로우 루프
             while (true)
             {
+                // 1. 손패 연산자 최적 배치
                 if (stage.useOperatorCards && Hand.Count > 0)
                     TryAutoPlaceOperator(stage);
 
+                // 2. 현재 점수 계산
                 long total = ExpressionEvaluator.Evaluate(
                     FieldData, stage.useFlexibleAce, stage.bustValue);
 
@@ -116,12 +123,14 @@ namespace HTH
                     break;
                 }
 
+                // 3. 스탠드 판단
                 if (!dealerStrategy.ShouldHit(total, stage))
                 {
                     Debug.Log("[Dealer] ShouldHit false — 턴 종료");
                     break;
                 }
 
+                // 4. 카드 드로우
                 if (!deckRunner.TryDraw(out DeckSO.CardEntry entry))
                 {
                     Debug.Log("[Dealer] 덱 소진 — 턴 종료");
@@ -141,62 +150,99 @@ namespace HTH
                 }
             }
 
+            // 턴 종료 직전 손패에 남은 연산자 마지막으로 한 번 더 배치 시도
             if (stage.useOperatorCards && Hand.Count > 0)
                 TryAutoPlaceOperator(stage);
 
             OnDealerTurnEnded?.Invoke();
         }
 
-        // ─── AI 연산자 자동 배치 ──────────────────────────────────
+        // ─── AI 연산자 자동 배치 (Brute-Force 전탐색) ────────────────
 
+        /// <summary>
+        /// 손패에 있는 연산자를 모든 슬롯 × 모든 연산자 조합으로 전탐색하여
+        /// 최적 위치에 배치합니다.
+        ///
+        /// 판단 기준 (우선순위):
+        /// 1순위: 배치 후 결과가 bustValue 이하이면서 bustValue에 가장 가까운 경우
+        /// 2순위: 모든 배치가 버스트라면, 결과가 가장 작은 위치
+        ///        (다음 턴에 ÷ 또는 − 카드로 구제받을 확률 극대화)
+        ///
+        /// 슬롯 정의: 숫자 카드 N장 → N-1개의 빈 슬롯(이미 연산자가 없는 슬롯만 대상)
+        /// </summary>
         private void TryAutoPlaceOperator(StageDataSO stage)
         {
             var numberEntries = GetNumberEntries();
             if (numberEntries.Count < 2 || Hand.Count == 0) return;
 
-            int slotIndex = numberEntries.Count - 2;
-            if (IsSlotOccupied(slotIndex)) return;
+            int slotCount = numberEntries.Count - 1; // 숫자 N개 → 슬롯 N-1개
 
-            DeckSO.CardEntry bestOp = SelectBestOperator(numberEntries, stage);
-            if (bestOp == null) return;
+            DeckSO.CardEntry bestOp   = null;
+            int              bestSlot = -1;
+            long             bestScore = long.MinValue; // 非버스트: 클수록 좋음(목표 근접)
 
-            Hand.Remove(bestOp);
-            InsertOperatorAt(slotIndex, bestOp);
+            DeckSO.CardEntry fallbackOp   = null;
+            int              fallbackSlot = -1;
+            long             fallbackMin  = long.MaxValue; // 全버스트 fallback: 작을수록 좋음
 
-            Debug.Log($"[DealerManager] 연산자 자동 배치 — " +
-                      $"slot:{slotIndex} op:{bestOp.data.displayLabel}");
-        }
-
-        private DeckSO.CardEntry SelectBestOperator(
-            List<DeckSO.CardEntry> numberEntries,
-            StageDataSO stage)
-        {
-            DeckSO.CardEntry bestOp = null;
-            long bestScore = long.MinValue;
+            bool anyNonBust = false;
 
             foreach (var op in Hand)
             {
-                var simField = BuildSimulatedField(numberEntries, op, numberEntries.Count - 2);
-                long result = ExpressionEvaluator.Evaluate(
-                    simField, stage.useFlexibleAce, stage.bustValue);
-                long score = ScoreResult(result, stage);
-
-                if (score > bestScore)
+                for (int slot = 0; slot < slotCount; slot++)
                 {
-                    bestScore = score;
-                    bestOp = op;
+                    if (IsSlotOccupied(slot)) continue;
+
+                    var simField = BuildSimulatedField(numberEntries, op, slot);
+                    long result  = ExpressionEvaluator.Evaluate(
+                        simField, stage.useFlexibleAce, stage.bustValue);
+
+                    Debug.Log($"[DealerManager] 시뮬 op:{op.data.displayLabel} " +
+                              $"slot:{slot} → {result} (bust>{stage.bustValue})");
+
+                    if (result <= stage.bustValue)
+                    {
+                        anyNonBust = true;
+                        long score = -(stage.bustValue - result); // diff 작을수록 score 높음
+                        if (score > bestScore)
+                        {
+                            bestScore = score;
+                            bestOp    = op;
+                            bestSlot  = slot;
+                        }
+                    }
+                    else
+                    {
+                        // 全버스트 fallback: 가장 결과값이 작은 배치 선택
+                        if (result < fallbackMin)
+                        {
+                            fallbackMin  = result;
+                            fallbackOp   = op;
+                            fallbackSlot = slot;
+                        }
+                    }
                 }
             }
 
-            return bestOp;
+            DeckSO.CardEntry chosenOp   = anyNonBust ? bestOp   : fallbackOp;
+            int              chosenSlot = anyNonBust ? bestSlot : fallbackSlot;
+
+            if (chosenOp == null) return;
+
+            Hand.Remove(chosenOp);
+            InsertOperatorAt(chosenSlot, chosenOp);
+
+            Debug.Log($"[DealerManager] 최적 연산자 배치 완료 — " +
+                      $"op:{chosenOp.data.displayLabel} slot:{chosenSlot} " +
+                      $"(NonBust선택:{anyNonBust})");
         }
 
-        private long ScoreResult(long result, StageDataSO stage)
-        {
-            if (result > stage.bustValue) return long.MinValue;
-            return -(stage.bustValue - result);
-        }
+        // ─── 시뮬레이션 헬퍼 ─────────────────────────────────────
 
+        /// <summary>
+        /// 숫자 카드 리스트에서 slotIndex번째 숫자 뒤에 연산자를 끼운 가상 필드를 만듭니다.
+        /// 예) [3, 7, 5] 에서 slot=1 에 op(×) → [3, 7, ×, 5]
+        /// </summary>
         private List<CardDataSO> BuildSimulatedField(
             List<DeckSO.CardEntry> numberEntries,
             DeckSO.CardEntry op,
@@ -205,11 +251,14 @@ namespace HTH
             var sim = new List<CardDataSO>();
             for (int i = 0; i < numberEntries.Count; i++)
             {
-                if (i == slotIndex + 1) sim.Add(op.data);
                 sim.Add(numberEntries[i].data);
+                if (i == slotIndex)
+                    sim.Add(op.data);
             }
             return sim;
         }
+
+        // ─── 유틸리티 ────────────────────────────────────────────
 
         private List<DeckSO.CardEntry> GetNumberEntries()
         {
@@ -220,23 +269,33 @@ namespace HTH
             return result;
         }
 
+        /// <summary>
+        /// 숫자[slotIndex]와 숫자[slotIndex+1] 사이에 이미 연산자가 있는지 확인합니다.
+        /// </summary>
         private bool IsSlotOccupied(int slotIndex)
         {
-            int opCount = 0;
+            int numSeen = -1;
             foreach (var entry in Field)
             {
-                if (entry.data.cardType == CardType.Operator)
+                if (entry.data.cardType == CardType.Number)
                 {
-                    if (opCount == slotIndex) return true;
-                    opCount++;
+                    numSeen++;
+                    if (numSeen == slotIndex) continue;
+                }
+                else if (entry.data.cardType == CardType.Operator && numSeen == slotIndex)
+                {
+                    return true;
                 }
             }
             return false;
         }
 
+        /// <summary>
+        /// 숫자[slotIndex] 바로 뒤에 연산자를 Field 리스트에 삽입합니다.
+        /// </summary>
         private void InsertOperatorAt(int slotIndex, DeckSO.CardEntry op)
         {
-            int numSeen = -1;
+            int numSeen  = -1;
             int insertPos = Field.Count;
 
             for (int i = 0; i < Field.Count; i++)

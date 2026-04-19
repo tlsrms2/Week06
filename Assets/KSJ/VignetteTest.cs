@@ -4,9 +4,9 @@ using UnityEngine.Rendering.Universal;
 
 public class VignetteTest : MonoBehaviour
 {
-    [Range(0f, 10000f)]
+    [Range(0f, 100f)]
     public float betAmount = 0f;
-    public float maxBet = 10000f;
+    public float maxBet = 100f;
 
     private Vignette _vignette;
 

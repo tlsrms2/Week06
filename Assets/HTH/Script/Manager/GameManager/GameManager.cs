@@ -70,7 +70,8 @@ namespace HTH
             _blackjackManager = gameObject.AddComponent<BlackjackManager>();
             _playerHandManager = gameObject.AddComponent<PlayerHandManager>();
             _dealerManager = gameObject.AddComponent<DealerManager>();
-            _visionManager = gameObject.AddComponent<VisionManager>();
+            _visionManager = Object.FindAnyObjectByType<VisionManager>();
+            if (_visionManager == null) _visionManager = gameObject.AddComponent<VisionManager>();
 
             _stageManager.Initialize(_stageRegistry);
 

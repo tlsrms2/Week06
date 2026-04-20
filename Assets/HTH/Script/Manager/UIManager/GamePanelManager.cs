@@ -2,6 +2,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Video;
 
 namespace HTH
 {
@@ -27,10 +28,11 @@ namespace HTH
 
         // ─── Inspector — GameOver ─────────────────────────────────
         [Header("GameOver 패널")]
+        [SerializeField] private PauseManager _pauseManager;
         [SerializeField] private GameObject _gameOverPanel;
-        [SerializeField] private TextMeshProUGUI _gameOverTitleText;
-        [SerializeField] private TextMeshProUGUI _gameOverDetailText;
-        [SerializeField] private Button _gameOverRestartButton;
+
+        [SerializeField] private GameOverVideoPlayer _videoPlayer;
+        [SerializeField] private RawImage _gameOverImage;
 
         [Header("연산자 선택 패널")]
         [SerializeField] private GameObject _operatorChoicePanel;
@@ -71,25 +73,21 @@ namespace HTH
         /// <summary>게임 오버 패널을 표시합니다.</summary>
         public void ShowGameOver(Action onRestart)
         {
-            _gameOverPanel?.SetActive(true);
-            _gameOverTitleText.text = "GAME OVER";
-            _gameOverTitleText.color = UIColor.Hex("#F44336");
-            _gameOverDetailText.text =
-                $"시야를 모두 잃었습니다.\n" +
-                $"남은 시야: {VisionManager.Instance?.CurrentVision}";
+            _pauseManager?.Block();
 
-            BindRestart(onRestart);
+            _gameOverPanel?.SetActive(true);
+            _gameOverImage?.gameObject.SetActive(true);
+            _videoPlayer?.Play(() =>
+            {
+                _pauseManager?.Unblock();
+                BindRestart(onRestart);
+            });
         }
 
         /// <summary>스테이지 클리어 패널을 표시합니다.</summary>
         public void ShowStageClear(Action onRestart)
         {
             _gameOverPanel?.SetActive(true);
-            _gameOverTitleText.text = "C L E A R !";
-            _gameOverTitleText.color = UIColor.Hex("#FFD700");
-            _gameOverDetailText.text =
-                $"모든 스테이지를 클리어했습니다!\n" +
-                $"남은 시야: {VisionManager.Instance?.CurrentVision}";
 
             BindRestart(onRestart);
         }
@@ -100,12 +98,8 @@ namespace HTH
 
         private void BindRestart(Action onRestart)
         {
-            _gameOverRestartButton.onClick.RemoveAllListeners();
-            _gameOverRestartButton.onClick.AddListener(() =>
-            {
-                _gameOverPanel?.SetActive(false);
-                onRestart?.Invoke();
-            });
+            _gameOverPanel?.SetActive(false);
+            onRestart?.Invoke();
         }
         public void ShowOperatorChoice()
         {

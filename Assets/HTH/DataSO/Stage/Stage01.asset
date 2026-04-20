@@ -15,13 +15,12 @@ MonoBehaviour:
   stageIndex: 1
   bustValue: 21
   maxHitCount: 0
-  operatorOnlyHit: 0
   deck: {fileID: 11400000, guid: a4f839fa04da59f4aa7bf83bf4f395a9, type: 2}
+  operatorCardRatio: 0
+  operatorOnlyHit: 0
+  useFlexibleAce: 1
   useOperatorCards: 0
   normalJudge: 1
   allowNegative: 0
-  useFlexibleAce: 1
-  operatorCardRatio: 0
-  useExponentialQuota: 0
-  visionBetMin: 5
-  visionBetMax: 50
+  visionBetMin: 20
+  visionBetMax: 20

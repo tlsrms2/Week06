@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -181,5 +182,11 @@ namespace HTH
 
         public void RemoveHandCard()
             => _fieldManager.RemoveHandCard();
+
+        /// <summary>
+        /// 모든 필드 카드를 순차적으로 수거하는 연출을 실행합니다.
+        /// </summary>
+        public IEnumerator CollectCardsSequentially()
+            => _fieldManager.CollectCardsSequentially();
     }
 }

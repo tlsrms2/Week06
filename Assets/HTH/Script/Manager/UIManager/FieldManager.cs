@@ -37,6 +37,14 @@ namespace HTH
         [Header("손패 UI (Canvas 안 RectTransform)")]
         [SerializeField] private RectTransform _playerHandContainer;
 
+        [Header("카드 수거 설정")]
+        [Tooltip("카드가 돌아갈 덱 위치")]
+        [SerializeField] private Transform _deckReturnPoint;
+        [Tooltip("카드 한 장이 수거되는 시간")]
+        [SerializeField] private float _collectMoveDuration = 0.4f;
+        [Tooltip("카드 사이의 수거 간격")]
+        [SerializeField] private float _collectInterval = 0.1f;
+
         // ─── 의존성 ───────────────────────────────────────────────
         private CardCreateManager _cardCreate;
 
@@ -66,6 +74,54 @@ namespace HTH
 
         public void Show() => _fieldPanelRoot?.SetActive(true);
         public void Hide() => _fieldPanelRoot?.SetActive(false);
+
+        // ─── 카드 수거 연출 ───────────────────────────────────────
+
+        /// <summary>
+        /// 필드와 손패의 모든 카드를 순차적으로 덱 위치로 되돌리며 파괴합니다.
+        /// </summary>
+        public IEnumerator CollectCardsSequentially()
+        {
+            // 모든 카드를 하나의 리스트로 통합 (딜러 필드 -> 플레이어 필드 -> 손패 순)
+            List<ICardView> allCards = new List<ICardView>();
+            allCards.AddRange(_dealerFieldCards);
+            allCards.AddRange(_playerFieldCards);
+            allCards.AddRange(_playerHandCards);
+
+            // 리스트 클리어 (오브젝트는 아직 파괴 전)
+            _dealerFieldCards.Clear();
+            _playerFieldCards.Clear();
+            _playerHandCards.Clear();
+            _dealerHiddenCardView = null;
+
+            foreach (var view in allCards)
+            {
+                if (view is not MonoBehaviour mb || mb == null) continue;
+
+                // 덱 위치가 지정되어 있다면 이동 연출
+                if (_deckReturnPoint != null)
+                {
+                    mb.transform.DOKill();
+                    // 월드 좌표로 이동
+                    mb.transform.DOMove(_deckReturnPoint.position, _collectMoveDuration).SetEase(Ease.InQuad);
+                    // 회전도 덱 방향에 맞춰주면 좋음 (필요 시)
+                    mb.transform.DORotateQuaternion(_deckReturnPoint.rotation * Quaternion.Euler(0, 180f, 0), _collectMoveDuration);
+                    
+                    // 이동 완료 후 파괴
+                    Destroy(mb.gameObject, _collectMoveDuration);
+                }
+                else
+                {
+                    // 덱 위치가 없으면 즉시 파괴
+                    Destroy(mb.gameObject);
+                }
+
+                yield return new WaitForSeconds(_collectInterval);
+            }
+
+            // 모든 카드가 수거될 때까지 대기 (마지막 카드 이동 시간 고려)
+            yield return new WaitForSeconds(_collectMoveDuration);
+        }
 
         // ─── 플레이어 필드 (3D) ───────────────────────────────────
 

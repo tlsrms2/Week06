@@ -37,6 +37,7 @@ namespace HTH
         private PlayerHandManager _playerHandManager;
         private DealerManager _dealerManager;
         private VisionManager _visionManager;
+        private EyeSpawnManager _eyeSpawnManager;
         private IDealerStrategy _dealerStrategy;
         private DeckRunner _deckRunner;
 
@@ -72,6 +73,8 @@ namespace HTH
             
             _visionManager = Object.FindAnyObjectByType<VisionManager>();
             if (_visionManager == null) _visionManager = gameObject.AddComponent<VisionManager>();
+
+            _eyeSpawnManager = Object.FindAnyObjectByType<EyeSpawnManager>();
 
             _stageManager.Initialize(_stageRegistry);
 
@@ -192,8 +195,28 @@ namespace HTH
             if (win) _visionManager.WinBet();
             else _visionManager.LoseBet();
 
-            if (win) OnStageWin();
-            else OnStageLose();
+            if (win)
+            {
+                if (_eyeSpawnManager != null)
+                {
+                    _eyeSpawnManager.OnWin(() => OnStageWin());
+                }
+                else
+                {
+                    OnStageWin();
+                }
+            }
+            else
+            {
+                if (_eyeSpawnManager != null)
+                {
+                    _eyeSpawnManager.OnLose(() => OnStageLose());
+                }
+                else
+                {
+                    OnStageLose();
+                }
+            }
         }
 
         private void OnEnterGameOver() => UI_ShowGameOver(OnRestartGame);
@@ -442,16 +465,37 @@ namespace HTH
 
         private void OnStartGame() { _stageManager.ResetAndLoad(); LoadStage(); TransitionTo(GameState.Betting); }
         private void OnConfirmBet(int bet) { _visionManager.SetBet(bet); TransitionTo(GameState.PlayerTurn); }
+        
         private void OnStageWin()
         {
-            if (_stageManager.IsLastStage) TransitionTo(GameState.StageClear);
-            else { _stageManager.LoadNext(); LoadStage(); TransitionTo(GameState.Betting); }
+            StartCoroutine(FinishStageRoutine(true));
         }
+
         private void OnStageLose()
         {
-            if (_visionManager.IsBlind()) TransitionTo(GameState.GameOver);
-            else { _stageManager.ReloadCurrent(); LoadStage(); TransitionTo(GameState.Betting); }
+            StartCoroutine(FinishStageRoutine(false));
         }
+
+        private IEnumerator FinishStageRoutine(bool win)
+        {
+            // 눈알 연출이 끝난 후, 카드들을 하나씩 원래 자리(덱)로 되돌리는 연출을 수행합니다.
+            if (_gameUI != null)
+            {
+                yield return StartCoroutine(_gameUI.CollectCardsSequentially());
+            }
+
+            if (win)
+            {
+                if (_stageManager.IsLastStage) TransitionTo(GameState.StageClear);
+                else { _stageManager.LoadNext(); LoadStage(); TransitionTo(GameState.Betting); }
+            }
+            else
+            {
+                if (_visionManager.IsBlind()) TransitionTo(GameState.GameOver);
+                else { _stageManager.ReloadCurrent(); LoadStage(); TransitionTo(GameState.Betting); }
+            }
+        }
+
         private void OnRestartGame() => TransitionTo(GameState.Title);
 
         private void LoadStage()
@@ -460,6 +504,9 @@ namespace HTH
             _playerHandManager.ResetAll();
             _dealerManager.ResetField();
             _deckRunner = new DeckRunner(_stageManager.CurrentStage.deck, _stageManager.CurrentStage);
+            
+            if (_eyeSpawnManager != null)
+                _eyeSpawnManager.SpawnAndMoveToStage();
         }
 
         private IEnumerator DealInitialCardsRoutine()

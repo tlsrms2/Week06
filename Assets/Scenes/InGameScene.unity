@@ -1968,7 +1968,7 @@ MonoBehaviour:
   _losePoint: {fileID: 272142123}
   _spawnUpDuration: 1.5
   _moveBackDuration: 2
-  _moveToLoseDuration: 0.2
+  _moveToLoseDuration: 0
   _dealerTransform: {fileID: 1435568636}
   _dealerAnimator: {fileID: 1435568633}
   _dealerIdleAnimTrigger: Idle

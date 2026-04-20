@@ -118,7 +118,7 @@ namespace HTH
             yield return new WaitForSeconds(_moveToLoseDuration);
 
             // 딜러 위치 설정 및 애니메이션 재생 시작
-            if (_dealerTransform != null && _dealerLosePoint != Vector3.zero)
+            if (_dealerTransform != null && _dealerLosePoint != null)
             {
                 _dealerTransform.position = _dealerLosePoint;
             }
@@ -131,23 +131,12 @@ namespace HTH
             // 2. 지정된 시간만큼 먼저 대기 (딜러가 동작을 취할 시간 등)
             yield return new WaitForSeconds(_destroyWaitAfterLose);
 
-            // 3. Lerp를 사용하여 눈알이 서서히 눌려 터지는 연출
-            if (_currentEye != null)
-            {
-                float elapsed = 0f;
-                Vector3 startScale = _currentEye.transform.localScale;
-                Vector3 targetScale = new Vector3(startScale.x * 1.5f, 0.05f, startScale.z * 1.5f);
+            // 3. [수정] Lerp를 사용하여 눈알이 서서히 눌려 터지는 연출
+            _currentEye.transform.DOScaleY(0.1f, _squashDuration).SetEase(Ease.InQuad);
+            // _currentEye.transform.DOScaleX(1.4f, _squashDuration).SetEase(Ease.InQuad);
+            // _currentEye.transform.DOScaleZ(1.4f, _squashDuration).SetEase(Ease.InQuad);
 
-                while (elapsed < _squashDuration)
-                {
-                    if (_currentEye == null) break;
-
-                    elapsed += Time.deltaTime;
-                    float t = elapsed / _squashDuration;
-                    _currentEye.transform.localScale = Vector3.Lerp(startScale, targetScale, t);
-                    yield return null;
-                }
-            }
+            yield return new WaitForSeconds(_squashDuration);
 
             if (_currentEye != null && _breakParticlePrefab != null)
             {
@@ -161,7 +150,7 @@ namespace HTH
                 Destroy(_currentEye);
             }
 
-            // 5. 완료 콜백 (다음 스테이지/재시작 로직 진행)
+            // 5. 완료 콜백
             onComplete?.Invoke();
         }
     }

@@ -74,7 +74,6 @@ Assets/HTH/Script/
   DealerManager.cs
   EyeSpawnManager.cs
   GameManager.cs
-  JumpScareManager.cs
   PlayerHandManager.cs
   StageManager.cs
  Manager/

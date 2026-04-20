@@ -69,6 +69,7 @@ Assets/HTH/Script/Dealer/
 Assets/HTH/Script/
  DeckRunner.cs
  Effect/Vision_Effect.cs
+ GameClear.cs
  GameOverVideoPlayer.cs
  Manager/GameManager/
   BlackJackManager.cs

@@ -2423,7 +2423,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HTH.VisionManager
   _maxVision: 100
-  _visionLossOnLose: 100
+  _visionLossOnLose: 10
 --- !u!1 &405878379
 GameObject:
   m_ObjectHideFlags: 0

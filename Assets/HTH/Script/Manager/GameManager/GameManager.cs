@@ -265,6 +265,14 @@ namespace HTH
         private void OnHit()
         {
             if (_playerHandManager.HasHandCard) return;
+
+            // [추가] 2줄(MaxCardsPerRow * 2)을 초과하여 카드를 뽑을 수 없도록 제한
+            if (_gameUI != null && _playerHandManager.Field.Count >= _gameUI.MaxCardsPerRow * 2)
+            {
+                Debug.Log("[GameManager] 2줄을 초과하여 카드를 뽑을 수 없습니다.");
+                return;
+            }
+
             if (_isProcessingHit || (Time.time < _lastHitTime + _hitCooldown)) return;
             
             _lastHitTime = Time.time;

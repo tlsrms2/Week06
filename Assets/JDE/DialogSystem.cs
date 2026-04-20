@@ -94,6 +94,7 @@ public class DialogSystem : MonoBehaviour
 
     private void ShowNextLine()
     {
+        AudioManager.instance.PlaySfx(AudioManager.Sfx.S2);
         currentIndex++;
         SetArrow(false);
         textDialog.gameObject.SetActive(true);

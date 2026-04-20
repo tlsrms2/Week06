@@ -40,6 +40,7 @@ namespace HTH
         private EyeSpawnManager _eyeSpawnManager;
         private IDealerStrategy _dealerStrategy;
         private DeckRunner _deckRunner;
+        private DialogSystem _dialogSystem;
 
         // ─── 상태 ─────────────────────────────────────────────────
         private GameState _state;
@@ -75,6 +76,8 @@ namespace HTH
             if (_visionManager == null) _visionManager = gameObject.AddComponent<VisionManager>();
 
             _eyeSpawnManager = Object.FindAnyObjectByType<EyeSpawnManager>();
+            
+            _dialogSystem = Object.FindAnyObjectByType<DialogSystem>();
 
             _stageManager.Initialize(_stageRegistry);
 
@@ -116,6 +119,14 @@ namespace HTH
                 _dealerManager.OnDealerTurnEnded -= OnDealerTurnEnded;
                 _dealerManager.OnDealerCardRevealed -= OnDealerCardRevealed;
                 _dealerManager.OnDealerOperatorPlaced -= OnDealerOperatorPlaced;
+            }
+        }
+
+        private void Update()
+        {
+            if (_dialogSystem != null && _dialogSystem.IsActive)
+            {
+                _dialogSystem.UpdateDialog();
             }
         }
 
@@ -490,7 +501,28 @@ namespace HTH
 
         // ─── 플로우 ──────────────────────────────────────────────
 
-        private void OnStartGame() { _stageManager.ResetAndLoad(); LoadStage(); TransitionTo(GameState.Betting); }
+        private void OnStartGame()
+        {
+            _stageManager.ResetAndLoad();
+            LoadStage();
+            
+            if (_dialogSystem != null)
+            {
+                _dialogSystem.ShowDialog(0);
+                StartCoroutine(WaitDialogAndTransition(GameState.Betting));
+            }
+            else
+            {
+                TransitionTo(GameState.Betting);
+            }
+        }
+
+        private IEnumerator WaitDialogAndTransition(GameState nextState)
+        {
+            yield return new WaitUntil(() => !_dialogSystem.IsActive);
+            TransitionTo(nextState);
+        }
+
         private void OnConfirmBet(int bet) { _visionManager.SetBet(bet); TransitionTo(GameState.PlayerTurn); }
         
         private void OnStageWin()
@@ -514,7 +546,21 @@ namespace HTH
             if (win)
             {
                 if (_stageManager.IsLastStage) TransitionTo(GameState.StageClear);
-                else { _stageManager.LoadNext(); LoadStage(); TransitionTo(GameState.Betting); }
+                else
+                {
+                    _stageManager.LoadNext();
+                    LoadStage();
+                    
+                    _dialogSystem?.ShowDialog(_stageManager.StageIndex);
+                    if (_dialogSystem != null && _dialogSystem.IsActive)
+                    {
+                        StartCoroutine(WaitDialogAndTransition(GameState.Betting));
+                    }
+                    else
+                    {
+                        TransitionTo(GameState.Betting);
+                    }
+                }
             }
             else
             {

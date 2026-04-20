@@ -2423,7 +2423,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HTH.VisionManager
   _maxVision: 100
-  _visionLossOnLose: 10
+  _visionLossOnLose: 20
 --- !u!1 &405878379
 GameObject:
   m_ObjectHideFlags: 0
@@ -9770,6 +9770,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HTH.GamePanelManager
   _hitButton: {fileID: 1209193915}
   _stayButton: {fileID: 1533953345}
+  _buttonCooldown: 0.5
   _resultPanel: {fileID: 1990001811}
   _resultTitleText: {fileID: 1251067125}
   _resultExprText: {fileID: 350205679}
@@ -14966,7 +14967,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &2066167061
 RectTransform:
   m_ObjectHideFlags: 0
@@ -15202,7 +15203,7 @@ VideoPlayer:
   m_EnabledAudioTracks: 
   m_DirectAudioMutes: 
   m_ControlledAudioTrackCount: 0
-  m_PlayOnAwake: 1
+  m_PlayOnAwake: 0
   m_SkipOnDrop: 1
   m_Looping: 0
   m_WaitForFirstFrame: 1

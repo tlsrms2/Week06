@@ -98,7 +98,7 @@ namespace HTH
 
         private void Start()
         {
-            //AudioManager.instance.PlayBgm(true);
+            AudioManager.instance.PlayBgm(AudioManager.Bgm.ingame);
             TransitionTo(GameState.Title);
         }
 
@@ -161,6 +161,7 @@ namespace HTH
             var stage = _stageManager.CurrentStage;
             if (_visionManager.CurrentVision <= 0)
             {
+                Debug.Log("OnEnterBetting");
                 TransitionTo(GameState.GameOver);
                 return;
             }
@@ -492,7 +493,8 @@ namespace HTH
             }
             else
             {
-                TransitionTo(GameState.GameOver);
+                Debug.Log("OnVisionDepleted");
+                //TransitionTo(GameState.GameOver);
             }
         }
 
@@ -564,6 +566,7 @@ namespace HTH
             }
             else
             {
+                Debug.Log("FinishStageRoutine");
                 if (_visionManager.IsBlind()) TransitionTo(GameState.GameOver);
                 else { _stageManager.ReloadCurrent(); LoadStage(); TransitionTo(GameState.Betting); }
             }

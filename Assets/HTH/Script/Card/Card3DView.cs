@@ -1,23 +1,25 @@
-﻿using System;
+using System;
 using UnityEngine;
 
 namespace HTH
 {
     /// <summary>
     /// ICardView의 3D 카드 구현체.
-    /// CardCreateManager.CreateFrom3DPrefab에서 AddComponent로 추가됩니다.
-    /// 프리팹에 미리 부착하지 않습니다.
-    ///
-    /// 앞뒤면 전환
-    /// └── Y축 회전으로 처리
-    ///     뒷면 : rotation.y = 0
-    ///     앞면 : rotation.y = 180
+    /// 연산자 카드는 드래그로 필드에 배치합니다.
     /// </summary>
     public class Card3DView : MonoBehaviour, ICardView
     {
         // ─── ICardView ────────────────────────────────────────────
         public CardDataSO Data { get; private set; }
         public event Action<ICardView> OnClicked;
+
+        // ─── 드래그 이벤트 (FieldManager가 구독) ─────────────────
+        /// <summary>드래그 중 매 프레임 발행 (월드 포지션)</summary>
+        public event Action<Card3DView, Vector3> OnDragging;
+        /// <summary>드래그 종료 시 발행 (월드 포지션)</summary>
+        public event Action<Card3DView, Vector3> OnDropped;
+        /// <summary>드래그 시작 시 발행</summary>
+        public event Action<Card3DView> OnDragStarted;
 
         // ─── 컴포넌트 참조 ────────────────────────────────────────
         private MeshRenderer _meshRenderer;
@@ -26,9 +28,13 @@ namespace HTH
 
         // ─── 상태 ─────────────────────────────────────────────────
         private bool _interactable = true;
-        private bool _isSelected = false;
+        private bool _isDragging = false;
+        private bool _isDragEnabled = false;  // 드래그 허용 여부 (조커 뜰 때만 true)
 
-        private float _selectedOffsetY = 0.22f;
+        // ─── 드래그 내부 ──────────────────────────────────────────
+        private Camera _mainCam;
+        private Plane _dragPlane;
+        private Vector3 _dragOffset;
 
         // ─── 앞뒤면 각도 ──────────────────────────────────────────
         private static readonly Quaternion FaceUpRotation
@@ -40,57 +46,72 @@ namespace HTH
 
         private void Awake()
         {
-            // AddComponent 후 프리팹 컴포넌트 참조
             _meshRenderer = GetComponent<MeshRenderer>();
             _col = GetComponent<BoxCollider>();
             _rigid = GetComponent<Rigidbody>();
+            _mainCam = Camera.main;
         }
 
         private void OnMouseDown()
         {
             if (!_interactable) return;
 
-            // 연산자 카드만 선택 시 이동
-            if (Data != null && Data.cardType == CardType.Operator)
+            if (_isDragEnabled && Data != null && Data.cardType == CardType.Operator)
             {
-                _isSelected = !_isSelected;
+                // 드래그 시작: 카메라가 바라보는 평면
+                _mainCam = Camera.main;
+                if (_mainCam != null)
+                {
+                    _dragPlane = new Plane(-_mainCam.transform.forward, transform.position);
+                    _isDragging = true;
+                    
+                    Vector3 pointerHit = GetDragWorldPosition();
+                    // Z축 오프셋을 주면 UI 스케일에 따라 카메라 뒤로 넘어가버릴 수 있으므로 
+                    // 잡았을 때 사라지는 버그를 막기 위해 오프셋을 제거합니다.
+                    _dragOffset = transform.position - pointerHit;
 
-                var pos = transform.localPosition;
-                pos.x = _isSelected ? _selectedOffsetY : 0f;
-                transform.localPosition = pos;
+                    OnDragStarted?.Invoke(this);
+                }
             }
+            else
+            {
+                OnClicked?.Invoke(this);
+            }
+        }
 
-            OnClicked?.Invoke(this);
+        private void OnMouseDrag()
+        {
+            if (!_interactable || !_isDragging) return;
+
+            Vector3 worldPos = GetDragWorldPosition() + _dragOffset;
+            transform.position = worldPos;
+            OnDragging?.Invoke(this, worldPos);
+        }
+
+        private void OnMouseUp()
+        {
+            if (!_interactable || !_isDragging) return;
+
+            _isDragging = false;
+            Vector3 worldPos = GetDragWorldPosition() + _dragOffset;
+            OnDropped?.Invoke(this, worldPos);
         }
 
         // ─── ICardView 구현 ───────────────────────────────────────
 
-        /// <summary>카드 데이터를 초기화합니다.</summary>
         public void Initialize(CardDataSO data)
         {
             Data = data;
         }
 
-        /// <summary>클릭 가능 여부를 설정합니다.</summary>
         public void SetInteractable(bool interactable)
         {
             _interactable = interactable;
             if (_col != null) _col.enabled = interactable;
         }
 
-        /// <summary>선택 상태를 시각적으로 표시합니다.</summary>
-        public void SetSelected(bool selected)
-        {
-            // 연산자 카드만 위치 변경
-            if (Data == null || Data.cardType != CardType.Operator) return;
+        public void SetSelected(bool selected) { /* 드래그 방식으로 전환 — 미사용 */ }
 
-            _isSelected = selected;
-            var pos = transform.localPosition;
-            pos.x = selected ? _selectedOffsetY : 0f;
-            transform.localPosition = pos;
-        }
-
-        /// <summary>시야 감소 시 블러를 적용합니다.</summary>
         public void SetBlurLevel(float normalized)
         {
             if (_meshRenderer == null) return;
@@ -99,16 +120,31 @@ namespace HTH
             _meshRenderer.material.color = color;
         }
 
-        /// <summary>OnClicked 이벤트 구독을 해제합니다.</summary>
-        public void ClearClickListeners()
-            => OnClicked = null;
+        public void ClearClickListeners() => OnClicked = null;
 
-        /// <summary>앞면을 공개합니다. Y축 180도 회전.</summary>
         public void SetFaceUp()
             => transform.localRotation = FaceUpRotation;
 
-        /// <summary>뒷면을 공개합니다. Y축 0도 회전.</summary>
         public void SetFaceDown()
             => transform.localRotation = FaceDownRotation;
+
+        // ─── 드래그 공개 API ──────────────────────────────────────
+
+        /// <summary>조커 카드가 손패에 왔을 때 드래그를 허용합니다.</summary>
+        public void EnableDrag() => _isDragEnabled = true;
+
+        /// <summary>배치 완료 또는 턴 종료 시 드래그를 비활성합니다.</summary>
+        public void DisableDrag() => _isDragEnabled = false;
+
+        // ─── 내부 헬퍼 ────────────────────────────────────────────
+
+        private Vector3 GetDragWorldPosition()
+        {
+            if (_mainCam == null) _mainCam = Camera.main;
+            Ray ray = _mainCam.ScreenPointToRay(Input.mousePosition);
+            if (_dragPlane.Raycast(ray, out float dist))
+                return ray.GetPoint(dist);
+            return transform.position;
+        }
     }
 }

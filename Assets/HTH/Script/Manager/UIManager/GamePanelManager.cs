@@ -66,60 +66,6 @@ namespace HTH
 
         // ─── Result 패널 ──────────────────────────────────────────
 
-        /// <summary>
-        /// Result 패널을 표시합니다.
-        /// win = true면 다음 스테이지, false면 재도전 버튼을 표시합니다.
-        /// </summary>
-        public void ShowResult(
-            string description,
-            bool win,
-            Action onNext)
-        {
-            _resultPanel?.SetActive(true);
-
-            _resultTitleText.text = win ? "S U C C E S S" : "B U S T !";
-            _resultTitleText.color = win
-                ? UIColor.Hex("#4CAF50")
-                : UIColor.Hex("#F44336");
-
-            _resultExprText.text = description;
-            _resultNextButtonLabel.text = win ? "다음 스테이지" : "재  도  전";
-
-            _resultNextButton.onClick.RemoveAllListeners();
-            _resultNextButton.onClick.AddListener(() =>
-            {
-                _resultPanel?.SetActive(false);
-                onNext?.Invoke();
-            });
-        }
-
-        /// <summary>결과 비교 텍스트를 갱신합니다.</summary>
-        public void SetResultCompare(
-            long playerTotal,
-            long dealerTotal,
-            long bustValue,
-            bool win)
-        {
-            if (_resultCompareText == null) return;
-
-            long playerDiff = Mathf.Abs((int)(bustValue - playerTotal));
-            long dealerDiff = Mathf.Abs((int)(bustValue - dealerTotal));
-
-            _resultCompareText.text = win
-                ? $"플레이어 {playerTotal:N0} (차이:{playerDiff}) " +
-                  $"vs 딜러 {dealerTotal:N0} (차이:{dealerDiff})"
-                : $"플레이어 {playerTotal:N0} (차이:{playerDiff}) " +
-                  $"vs 딜러 {dealerTotal:N0} (차이:{dealerDiff})";
-
-            _resultCompareText.color = win
-                ? UIColor.Hex("#FFD700")
-                : UIColor.Hex("#F44336");
-        }
-
-        /// <summary>Result 패널을 닫습니다.</summary>
-        public void HideResult()
-            => _resultPanel?.SetActive(false);
-
         // ─── GameOver 패널 ────────────────────────────────────────
 
         /// <summary>게임 오버 패널을 표시합니다.</summary>

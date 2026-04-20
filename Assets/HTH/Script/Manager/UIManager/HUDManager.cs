@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -68,7 +68,7 @@ namespace HTH
 
             if (field == null || field.Count == 0)
             {
-                _playerValueText.text = "= 0";
+                _playerValueText.text = "0";
                 _playerValueText.color = ColorDefault;
                 return;
             }
@@ -79,7 +79,7 @@ namespace HTH
                 stage.bustValue,
                 stage.allowNegative);
 
-            _playerValueText.text = $"= {value:N0}";
+            _playerValueText.text = $"{value:N0}";
             _playerValueText.color = GetValueColor(value, stage);
         }
 
@@ -95,7 +95,7 @@ namespace HTH
 
             if (field == null || field.Count == 0)
             {
-                _dealerValueText.text = "—";
+                _dealerValueText.text = "0";
                 _dealerValueText.color = ColorDefault;
                 return;
             }
@@ -106,7 +106,7 @@ namespace HTH
                 stage.bustValue,
                 stage.allowNegative);
 
-            _dealerValueText.text = $"딜러: {value:N0}";
+            _dealerValueText.text = $"{value:N0}";
             _dealerValueText.color = GetValueColor(value, stage);
         }
 
@@ -114,8 +114,16 @@ namespace HTH
         public void ClearDealerValue()
         {
             if (_dealerValueText == null) return;
-            _dealerValueText.text = "—";
+            _dealerValueText.text = "0";
             _dealerValueText.color = ColorDefault;
+        }
+
+        /// <summary>플레이어 값 텍스트를 초기화합니다.</summary>
+        public void ClearPlayerValue()
+        {
+            if (_playerValueText == null) return;
+            _playerValueText.text = "0";
+            _playerValueText.color = ColorDefault;
         }
 
         // ─── 색상 판정 ────────────────────────────────────────────

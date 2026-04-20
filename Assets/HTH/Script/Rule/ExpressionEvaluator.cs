@@ -28,7 +28,7 @@ namespace HTH
 
             long result = useFlexibleAce
                 ? EvaluateWithFlexibleAce(numbers, operators, flexibleAces, bustThreshold)
-                : EvaluateInfix(numbers, operators);
+                : EvaluateInfix(numbers, operators, bustThreshold);
 
             // 음수 제한
             if (!allowNegative && result < 0)
@@ -91,7 +91,7 @@ namespace HTH
         /// 1. 곱셈(×)과 나눗셈(÷)을 왼쪽부터 먼저 계산합니다.
         /// 2. 덧셈(빈칸 포함)과 뺄셈(−)을 왼쪽부터 차례대로 계산합니다.
         /// </summary>
-        private static long EvaluateInfix(List<long> numbers, List<OperatorType> operators)
+        private static long EvaluateInfix(List<long> numbers, List<OperatorType> operators, long bustThreshold = long.MaxValue)
         {
             var nums = new List<long>(numbers);
             var ops = new List<OperatorType>(operators);
@@ -111,6 +111,13 @@ namespace HTH
                     nums.RemoveAt(i + 1);
                     nums[i] = val;
                     ops.RemoveAt(i);
+
+                    // 곱/나 결과가 이미 bust이면 즉시 반환 (음수 예외: Divide 결과는 작아질 수 있음)
+                    if (val > bustThreshold)
+                    {
+                        UnityEngine.Debug.Log($"[Evaluator] 곱셈/나눗셈 중간값 {val} > bust({bustThreshold}) → 즉시 버스트 반환");
+                        return val;
+                    }
                 }
                 else
                 {

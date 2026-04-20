@@ -99,7 +99,7 @@ namespace HTH
             Debug.Log($"[GameUI] Vision — {current}/{max}");
         }
 
-        private void ApplyVignetteEffect()
+        public void ApplyVignetteEffect()
         {
             if (_vignette == null)
             {
@@ -177,7 +177,7 @@ namespace HTH
             ApplyVignetteEffect();
         }
 
-        public void LoseBet()
+        public void LoseBet(bool applyEffectImmediately = true)
         {
             // [수정] 설정된 시야 차감량만큼 감소
             CurrentVision = Mathf.Max(0, CurrentVision - _visionLossOnLose);
@@ -185,7 +185,11 @@ namespace HTH
             OnVisionChanged?.Invoke(CurrentVision, _maxVision);
             
             Debug.Log($"[VisionManager] LoseBet 호출 완료! ({_visionLossOnLose} 차감) 현재 시야: {CurrentVision}/{_maxVision}");
-            ApplyVignetteEffect();
+            
+            if (applyEffectImmediately)
+            {
+                ApplyVignetteEffect();
+            }
 
             if (CurrentVision <= 0)
                 OnVisionDepleted?.Invoke();

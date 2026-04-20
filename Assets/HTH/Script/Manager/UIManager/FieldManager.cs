@@ -27,6 +27,7 @@ namespace HTH
         [SerializeField] private float _cardSpacingY = 0.25f;
         [Tooltip("플레이어 한 줄 최대 카드 수")]
         [SerializeField] private int _maxCardsPerRow = 10;
+        public int MaxCardsPerRow => _maxCardsPerRow;
 
         [Tooltip("딜러 한 줄 최대 카드 수")]
         [SerializeField] private int _dealerMaxCardsPerRow = 10;

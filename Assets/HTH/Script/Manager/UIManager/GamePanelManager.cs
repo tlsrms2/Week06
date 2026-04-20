@@ -2,6 +2,8 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Video;
+using DG.Tweening;
 
 namespace HTH
 {
@@ -27,10 +29,13 @@ namespace HTH
 
         // ─── Inspector — GameOver ─────────────────────────────────
         [Header("GameOver 패널")]
+        [SerializeField] private PauseManager _pauseManager;
         [SerializeField] private GameObject _gameOverPanel;
-        [SerializeField] private TextMeshProUGUI _gameOverTitleText;
-        [SerializeField] private TextMeshProUGUI _gameOverDetailText;
-        [SerializeField] private Button _gameOverRestartButton;
+
+        [SerializeField] private GameOverVideoPlayer _videoPlayer;
+        [SerializeField] private RawImage _gameOverImage;
+        [SerializeField] private Image _fadeOverlay; // 페이드 효과용 검은 이미지
+        [SerializeField] private float _gameOverFadeDuration = 1.0f;
 
         [Header("연산자 선택 패널")]
         [SerializeField] private GameObject _operatorChoicePanel;
@@ -71,26 +76,42 @@ namespace HTH
         /// <summary>게임 오버 패널을 표시합니다.</summary>
         public void ShowGameOver(Action onRestart)
         {
-            _gameOverPanel?.SetActive(true);
-            _gameOverTitleText.text = "GAME OVER";
-            _gameOverTitleText.color = UIColor.Hex("#F44336");
-            _gameOverDetailText.text =
-                $"시야를 모두 잃었습니다.\n" +
-                $"남은 시야: {VisionManager.Instance?.CurrentVision}";
+            _pauseManager?.Block();
 
-            BindRestart(onRestart);
+            // [추가] 페이드 효과가 설정되어 있다면 먼저 어둡게 만듦
+            if (_fadeOverlay != null)
+            {
+                _fadeOverlay.gameObject.SetActive(true);
+                _fadeOverlay.color = new Color(0, 0, 0, 0);
+                _fadeOverlay.DOFade(1f, _gameOverFadeDuration).OnComplete(() => 
+                {
+                    ProceedToShowGameOver(onRestart);
+                });
+            }
+            else
+            {
+                ProceedToShowGameOver(onRestart);
+            }
+        }
+
+        private void ProceedToShowGameOver(Action onRestart)
+        {
+            // [수정] 영상과 패널이 보여야 하므로 암전용 가림막을 비활성화합니다.
+            if (_fadeOverlay != null) _fadeOverlay.gameObject.SetActive(false);
+
+            _gameOverPanel?.SetActive(true);
+            _gameOverImage?.gameObject.SetActive(true);
+            _videoPlayer?.Play(() =>
+            {
+                _pauseManager?.Unblock();
+                BindRestart(onRestart);
+            });
         }
 
         /// <summary>스테이지 클리어 패널을 표시합니다.</summary>
         public void ShowStageClear(Action onRestart)
         {
             _gameOverPanel?.SetActive(true);
-            _gameOverTitleText.text = "C L E A R !";
-            _gameOverTitleText.color = UIColor.Hex("#FFD700");
-            _gameOverDetailText.text =
-                $"모든 스테이지를 클리어했습니다!\n" +
-                $"남은 시야: {VisionManager.Instance?.CurrentVision}";
-
             BindRestart(onRestart);
         }
 
@@ -100,12 +121,27 @@ namespace HTH
 
         private void BindRestart(Action onRestart)
         {
-            _gameOverRestartButton.onClick.RemoveAllListeners();
-            _gameOverRestartButton.onClick.AddListener(() =>
+            if (_fadeOverlay != null)
+            {
+                // [수정] 재시작 시 다시 가림막을 켜고(검은색), 밝아지는 연출을 수행합니다.
+                _fadeOverlay.color = Color.black;
+                _fadeOverlay.gameObject.SetActive(true);
+                _gameOverPanel?.SetActive(false);
+
+                // 콜백(씬 로드 등) 실행
+                onRestart?.Invoke();
+
+                // 서서히 밝아지는 연출 (씬이 로드되는 동안 가림막 역할)
+                _fadeOverlay.DOFade(0f, _gameOverFadeDuration).SetEase(Ease.OutSine).OnComplete(() => 
+                {
+                    _fadeOverlay.gameObject.SetActive(false);
+                });
+            }
+            else
             {
                 _gameOverPanel?.SetActive(false);
                 onRestart?.Invoke();
-            });
+            }
         }
         public void ShowOperatorChoice()
         {

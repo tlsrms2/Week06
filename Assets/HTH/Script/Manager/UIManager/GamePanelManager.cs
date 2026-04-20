@@ -50,9 +50,18 @@ namespace HTH
             SetGameButtonLabel(_stayButton, "STAY");
 
             _hitButton.onClick.RemoveAllListeners();
-            _hitButton.onClick.AddListener(() => onHit?.Invoke());
+            _hitButton.onClick.AddListener(() =>
+            {
+                onHit?.Invoke();
+                AudioManager.instance.PlaySfx(AudioManager.Sfx.hit);
+            });
             _stayButton.onClick.RemoveAllListeners();
-            _stayButton.onClick.AddListener(() => onStand?.Invoke());
+            _stayButton.onClick.AddListener(() =>
+            {
+                onStand?.Invoke();
+                AudioManager.instance.PlaySfx(AudioManager.Sfx.stay);
+            });
+
         }
 
         /// <summary>Hit / Stay 버튼을 활성화합니다.</summary>
@@ -104,6 +113,7 @@ namespace HTH
             _videoPlayer?.Play(() =>
             {
                 _pauseManager?.Unblock();
+                AudioManager.instance.PlaySfx(AudioManager.Sfx.Ending);
                 BindRestart(onRestart);
             });
         }

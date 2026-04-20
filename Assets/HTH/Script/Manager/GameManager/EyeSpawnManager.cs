@@ -154,6 +154,7 @@ namespace HTH
 
                 _currentEye.transform.DOKill();
                 Destroy(_currentEye);
+                AudioManager.instance.PlaySfx(AudioManager.Sfx.dealerStab);
             }
 
             yield return new WaitUntil(() => isBlackoutDone);
@@ -172,6 +173,7 @@ namespace HTH
             yield return new WaitForSeconds(_delayBeforeCameraTransition);
 
             // 2. 카메라 전환
+            AudioManager.instance.PlaySfx(AudioManager.Sfx.dealer);
             if (SceneLoadManager.Instance != null && _reachOutCamera != null)
             {
                 CinemachineCamera fromCam = _mainGameCamera;
@@ -247,6 +249,9 @@ namespace HTH
 
             Destroy(canvasGo);
             onDone?.Invoke();
+
+            AudioManager.instance.PlaySfx(AudioManager.Sfx.whoosh);
+            AudioManager.instance.PlayBgm(AudioManager.Bgm.damaged);
         }
 
         public static void ResetSpecialRoutineFlag() => _hasPlayedSpecialRoutine = false;

@@ -7,7 +7,7 @@ public class AnimationTriggerController : MonoBehaviour
 
     [Header("각 애니메이션별 이동 위치 설정 (1번~6번)")]
     [Tooltip("인스펙터에서 각 번호에 맞는 X, Y, Z 좌표를 설정해주세요.")]
-    public Vector3[] targetPositions = new Vector3[6];
+    public Vector3[] targetPositions = new Vector3[7];
 
     void Start()
     {
@@ -41,6 +41,10 @@ public class AnimationTriggerController : MonoBehaviour
         else if (Input.GetKeyDown(KeyCode.Alpha6))
         {
             PlayAnimationAndMove(5, "Emotion3", 6);
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha7))
+        {
+            PlayAnimationAndMove(6, "HitDown", 7);
         }
     }
 

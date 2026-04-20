@@ -23,4 +23,4 @@ MonoBehaviour:
   normalJudge: 1
   allowNegative: 0
   visionBetMin: 10
-  visionBetMax: 50
+  visionBetMax: 10

@@ -37,6 +37,7 @@ namespace HTH
         private PlayerHandManager _playerHandManager;
         private DealerManager _dealerManager;
         private VisionManager _visionManager;
+        private EyeSpawnManager _eyeSpawnManager;
         private IDealerStrategy _dealerStrategy;
         private DeckRunner _deckRunner;
 
@@ -72,6 +73,8 @@ namespace HTH
             
             _visionManager = Object.FindAnyObjectByType<VisionManager>();
             if (_visionManager == null) _visionManager = gameObject.AddComponent<VisionManager>();
+
+            _eyeSpawnManager = Object.FindAnyObjectByType<EyeSpawnManager>();
 
             _stageManager.Initialize(_stageRegistry);
 
@@ -192,8 +195,28 @@ namespace HTH
             if (win) _visionManager.WinBet();
             else _visionManager.LoseBet();
 
-            if (win) OnStageWin();
-            else OnStageLose();
+            if (win)
+            {
+                if (_eyeSpawnManager != null)
+                {
+                    _eyeSpawnManager.OnWin(() => OnStageWin());
+                }
+                else
+                {
+                    OnStageWin();
+                }
+            }
+            else
+            {
+                if (_eyeSpawnManager != null)
+                {
+                    _eyeSpawnManager.OnLose(() => OnStageLose());
+                }
+                else
+                {
+                    OnStageLose();
+                }
+            }
         }
 
         private void OnEnterGameOver() => UI_ShowGameOver(OnRestartGame);
@@ -460,6 +483,9 @@ namespace HTH
             _playerHandManager.ResetAll();
             _dealerManager.ResetField();
             _deckRunner = new DeckRunner(_stageManager.CurrentStage.deck, _stageManager.CurrentStage);
+            
+            if (_eyeSpawnManager != null)
+                _eyeSpawnManager.SpawnAndMoveToStage();
         }
 
         private IEnumerator DealInitialCardsRoutine()

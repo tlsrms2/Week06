@@ -189,8 +189,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 482452}
+  - component: {fileID: 1158416550952720071}
   m_Layer: 0
-  m_Name: Eye S1 Iris_blue
+  m_Name: Eye
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -206,10 +207,28 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 2.4761, y: 2.4761, z: 2.4761}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 411182}
   - {fileID: 485228}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1158416550952720071
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 166794}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f97876c49733cdc4595a1b8b4aeefd0a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::JSG.EyeFlickerAnimation
+  _maxRotationAngle: 40
+  _flickDuration: 0.1
+  _minWaitTime: 0.5
+  _maxWaitTime: 3
+  _useMicroShake: 0
+  _shakeStrength: 0.02

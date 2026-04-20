@@ -22,5 +22,5 @@ MonoBehaviour:
   useOperatorCards: 0
   normalJudge: 1
   allowNegative: 0
-  visionBetMin: 10
-  visionBetMax: 10
+  visionBetMin: 20
+  visionBetMax: 20

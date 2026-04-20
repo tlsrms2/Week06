@@ -2080,7 +2080,7 @@ MonoBehaviour:
   _betDecButton: {fileID: 1126184244}
   _betIncButton: {fileID: 2007095398}
   _betConfirmButton: {fileID: 1884634015}
-  _betOptions: 0a0000000a0000000a0000000a0000000a000000
+  _betOptions: 1400000014000000140000001400000014000000
   _stageText: {fileID: 1077349023}
   _goalText: {fileID: 982008572}
   _currentVisionText: {fileID: 516632919}
@@ -5473,6 +5473,9 @@ MonoBehaviour:
   _dealerMaxCardsPerRow: 10
   _revealFlipDuration: 0.4
   _playerHandContainer: {fileID: 1721325898}
+  _deckReturnPoint: {fileID: 929421612}
+  _collectMoveDuration: 0.4
+  _collectInterval: 0.1
 --- !u!1001 &869222171
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -18,6 +18,9 @@ namespace HTH
         [Header("시야 설정")]
         [Tooltip("시야 최대치")]
         [SerializeField] private int _maxVision = 100;
+        
+        [Tooltip("패배 시 고정적으로 차감될 시야량")]
+        [SerializeField] private int _visionLossOnLose = 10;
 
         // ─── 프로퍼티 ─────────────────────────────────────────────
         public int MaxVision => _maxVision;
@@ -176,11 +179,12 @@ namespace HTH
 
         public void LoseBet()
         {
-            CurrentVision = Mathf.Max(0, CurrentVision - CurrentBet);
+            // [수정] 설정된 시야 차감량만큼 감소
+            CurrentVision = Mathf.Max(0, CurrentVision - _visionLossOnLose);
             CurrentBet = 0;
             OnVisionChanged?.Invoke(CurrentVision, _maxVision);
             
-            Debug.Log($"[VisionManager] LoseBet 호출 완료! 현재 시야: {CurrentVision}/{_maxVision}");
+            Debug.Log($"[VisionManager] LoseBet 호출 완료! ({_visionLossOnLose} 차감) 현재 시야: {CurrentVision}/{_maxVision}");
             ApplyVignetteEffect();
 
             if (CurrentVision <= 0)

@@ -102,13 +102,16 @@ namespace HTH
                 // 덱 위치가 지정되어 있다면 이동 연출
                 if (_deckReturnPoint != null)
                 {
-                    // 회전도 덱 방향에 맞춰주면 좋음 (필요 시)
                     StartCoroutine(RecollCard(mb, view));
 
                     yield return new WaitForSeconds(0.2f);
+                    if (mb == null) continue;
+
                     mb.transform.DOKill();
-                    // 월드 좌표로 이동
-                    mb.transform.DOMove(_deckReturnPoint.position, _collectMoveDuration).SetEase(Ease.InQuad);
+                    // SetLink를 추가하여 파괴 시 트윈이 안전하게 종료되도록 함
+                    mb.transform.DOMove(_deckReturnPoint.position, _collectMoveDuration)
+                        .SetEase(Ease.InQuad)
+                        .SetLink(mb.gameObject);
                     
                     // 이동 완료 후 파괴
                     Destroy(mb.gameObject, _collectMoveDuration);
@@ -574,7 +577,10 @@ namespace HTH
                 float y = -row * spacingY;
 
                 mb.transform.DOKill();
-                mb.transform.DOLocalMove(new Vector3(x, y, 0f), 0.15f).SetEase(Ease.OutQuad);
+                // SetLink를 추가하여 파괴 시 트윈이 안전하게 종료되도록 함
+                mb.transform.DOLocalMove(new Vector3(x, y, 0f), 0.15f)
+                    .SetEase(Ease.OutQuad)
+                    .SetLink(mb.gameObject);
             }
         }
 

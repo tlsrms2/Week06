@@ -74,7 +74,9 @@ namespace HTH
 
             _currentEye = Instantiate(_eyePrefab, _spawnPoint.position, _spawnPoint.rotation);
             
-            _currentEye.transform.DOMove(_stagePoint.position, _moveToStageDuration).SetEase(Ease.InOutQuad);
+            _currentEye.transform.DOMove(_stagePoint.position, _moveToStageDuration)
+                .SetEase(Ease.InOutQuad)
+                .SetLink(_currentEye);
         }
 
         /// <summary>
@@ -90,6 +92,7 @@ namespace HTH
 
             _currentEye.transform.DOMove(_spawnPoint.position, _moveBackDuration)
                 .SetEase(Ease.InOutQuad)
+                .SetLink(_currentEye)
                 .OnComplete(() =>
                 {
                     if (_currentEye != null) Destroy(_currentEye);
@@ -114,7 +117,9 @@ namespace HTH
         private IEnumerator LoseRoutine(Action onComplete)
         {
             // 1. 패배 지점으로 이동
-            _currentEye.transform.DOMove(_losePoint.position, _moveToLoseDuration).SetEase(Ease.InOutQuad);
+            _currentEye.transform.DOMove(_losePoint.position, _moveToLoseDuration)
+                .SetEase(Ease.InOutQuad)
+                .SetLink(_currentEye);
             yield return new WaitForSeconds(_moveToLoseDuration);
 
             // 딜러 위치 설정 및 애니메이션 재생 시작

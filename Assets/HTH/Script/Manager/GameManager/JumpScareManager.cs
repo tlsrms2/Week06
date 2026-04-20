@@ -5,135 +5,171 @@ using System.Collections;
 namespace HTH
 {
     /// <summary>
-    /// 플레이어의 시야 상태에 따라 딜러를 숨기거나 점프스케어를 실행합니다.
+    /// 시야가 0이 되었을 때 랜덤 점프스케어를 실행합니다.
     /// </summary>
     public class JumpScareManager : MonoBehaviour
     {
-        [Header("참조")]
-        [Tooltip("현재 씬에 있는 실제 딜러 객체")]
-        [SerializeField] private GameObject _realDealer;
-        [Tooltip("딜러를 복제할 때 사용할 프리팹 (점프스케어용)")]
-        [SerializeField] private GameObject _dealerPrefab;
+        [Header("디버그 설정")]
+        [SerializeField] private bool _useDebugScare = false;
+        [Range(1, 2)]
+        [SerializeField] private int _debugScareIndex = 1;
 
-        [Header("1단계: 숨기 (시야 20 이하)")]
-        [Tooltip("딜러가 숨을 위치")]
-        [SerializeField] private Transform _hidingPoint;
-        [Tooltip("숨는 위치로 이동하는 시간")]
-        [SerializeField] private float _hideMoveDuration = 5f;
-        [SerializeField] private int _hideThreshold = 20;
+        [Header("점프스케어 1 (시야 0)")]
+        [SerializeField] private GameObject _jumpScareObject;
+        [SerializeField] private Transform _jumpScareTargetPoint;
+        [SerializeField] private float _jumpScareMoveDuration = 3f;
 
-        [Header("2단계: 점프스케어 1 (시야 0)")]
-        [Tooltip("복제된 딜러가 나타날 시작 위치")]
-        [SerializeField] private Transform _js1StartPoint;
-        [Tooltip("위로 올라갈 높이")]
-        [SerializeField] private float _js1UpAmount = 2f;
-        [Tooltip("올라가는 시간")]
-        [SerializeField] private float _js1Duration = 3f;
+        [Header("점프스케어 2 (시야 0)")]
+        [Tooltip("회전/이동할 오브젝트")]
+        [SerializeField] private GameObject _js2Object;
+        
+        [Space(10)]
+        [Header("JS2 - 1단계 이동")]
+        [SerializeField] private Transform _js2TargetPoint1;
+        [SerializeField] private float _js2MoveDuration1 = 1f;
 
-        private bool _isHiding = false;
+        [Header("JS2 - 2단계 이동")]
+        [SerializeField] private Transform _js2TargetPoint2;
+        [SerializeField] private float _js2MoveDuration2 = 0.5f;
+
+        [Space(10)]
+        [SerializeField] private float _rotationPerTenVision = 3.33f;
+
         private bool _isScareTriggered = false;
 
-        private void OnEnable()
+        private Vector3 _js1InitialLocalPos;
+        private Vector3 _js1InitialLocalEuler;
+        private bool _js1InitialActive;
+
+        private Vector3 _js2InitialLocalPos;
+        private Vector3 _js2InitialLocalEuler;
+        private bool _js2InitialActive;
+
+        private void Awake()
+        {
+            if (_jumpScareObject != null)
+            {
+                _js1InitialLocalPos = _jumpScareObject.transform.localPosition;
+                _js1InitialLocalEuler = _jumpScareObject.transform.localEulerAngles;
+                _js1InitialActive = _jumpScareObject.activeSelf;
+            }
+
+            if (_js2Object != null)
+            {
+                _js2InitialLocalPos = _js2Object.transform.localPosition;
+                _js2InitialLocalEuler = _js2Object.transform.localEulerAngles;
+                _js2InitialActive = _js2Object.activeSelf;
+            }
+        }
+
+        private void Start()
+        {
+            StartCoroutine(WaitAndSubscribe());
+        }
+
+        private IEnumerator WaitAndSubscribe()
+        {
+            while (VisionManager.Instance == null) yield return null;
+            VisionManager.Instance.OnVisionChanged += UpdateJS2Rotation;
+            Debug.Log("<color=cyan>[JumpScare] VisionManager 구독 성공!</color>");
+        }
+
+        private void OnDestroy()
         {
             if (VisionManager.Instance != null)
-            {
-                VisionManager.Instance.OnVisionChanged += CheckVisionForHiding;
-                VisionManager.Instance.OnVisionDepleted += TriggerRandomJumpScare;
-            }
+                VisionManager.Instance.OnVisionChanged -= UpdateJS2Rotation;
         }
 
-        private void OnDisable()
+        private void UpdateJS2Rotation(int currentVision, int maxVision)
         {
-            if (VisionManager.Instance != null)
-            {
-                VisionManager.Instance.OnVisionChanged -= CheckVisionForHiding;
-                VisionManager.Instance.OnVisionDepleted -= TriggerRandomJumpScare;
-            }
-        }
+            if (_js2Object == null || _isScareTriggered) return;
 
-        /// <summary>
-        /// 시야가 20 이하로 떨어지면 딜러를 정해진 위치로 숨깁니다.
-        /// </summary>
-        private void CheckVisionForHiding(int currentVision, int maxVision)
-        {
-            if (!_isHiding && currentVision <= _hideThreshold && currentVision > 0)
-            {
-                _isHiding = true;
-                StartCoroutine(MoveDealerToHidingPoint());
-            }
-        }
+            float lostVision = maxVision - currentVision;
+            float targetYRotation = (lostVision / 10f) * _rotationPerTenVision;
+            Vector3 targetEuler = _js2InitialLocalEuler + new Vector3(0, targetYRotation, 0);
 
-        private IEnumerator MoveDealerToHidingPoint()
-        {
-            if (_realDealer == null || _hidingPoint == null) yield break;
-
-            Debug.Log("[JumpScare] 딜러가 숨을 위치로 이동을 시작합니다.");
-
-            // 애니메이터가 위치를 고정시키고 있을 수 있으므로 처리
-            Animator anim = _realDealer.GetComponent<Animator>();
-            if (anim != null) anim.enabled = false; 
-
-            _realDealer.transform.DOKill();
-            _realDealer.transform.DOMove(_hidingPoint.position, _hideMoveDuration).SetEase(Ease.Linear);
-            _realDealer.transform.DORotateQuaternion(_hidingPoint.rotation, _hideMoveDuration).SetEase(Ease.Linear);
-
-            yield return new WaitForSeconds(_hideMoveDuration);
+            _js2Object.transform.DOKill();
+            _js2Object.transform.DOLocalRotate(targetEuler, 0.5f).SetEase(Ease.OutQuad).SetLink(_js2Object);
             
+            Debug.Log($"[JumpScare] 시야 {currentVision}: JS2 {targetYRotation}도 회전");
+        }
+
+        public IEnumerator PlayRandomJumpScareRoutine(System.Action onComplete)
+        {
+            if (_isScareTriggered) yield break;
+            _isScareTriggered = true;
+
+            int targetIndex = _useDebugScare ? _debugScareIndex : Random.Range(1, 3);
+            Debug.Log($"[JumpScare] 점프스케어 {targetIndex}번 실행!");
+
+            if (targetIndex == 1) yield return StartCoroutine(JumpScareRoutine1());
+            else yield return StartCoroutine(JumpScareRoutine2());
+
+            onComplete?.Invoke();
+        }
+
+        private IEnumerator JumpScareRoutine1()
+        {
+            if (_jumpScareObject == null || _jumpScareTargetPoint == null) yield break;
+            if (!_jumpScareObject.activeSelf) _jumpScareObject.SetActive(true);
+
+            _jumpScareObject.transform.DOKill();
+            yield return _jumpScareObject.transform.DOMove(_jumpScareTargetPoint.position, _jumpScareMoveDuration)
+                .SetEase(Ease.InOutSine).SetLink(_jumpScareObject).WaitForCompletion();
+        }
+
+        private IEnumerator JumpScareRoutine2()
+        {
+            if (_js2Object == null || _js2TargetPoint1 == null || _js2TargetPoint2 == null)
+            {
+                Debug.LogWarning("[JumpScare] JS2 타겟 포인트가 설정되지 않았습니다.");
+                yield break;
+            }
+
+            if (!_js2Object.activeSelf) _js2Object.SetActive(true);
+
+            Animator anim = _js2Object.GetComponent<Animator>();
+            if (anim != null) anim.enabled = false;
+
+            _js2Object.transform.DOKill();
+
+            // [1단계 이동/회전]
+            Debug.Log("[JumpScare] JS2 1단계 이동 시작");
+            _js2Object.transform.DOMove(_js2TargetPoint1.position, _js2MoveDuration1).SetEase(Ease.InQuad).SetLink(_js2Object);
+            yield return _js2Object.transform.DORotateQuaternion(_js2TargetPoint1.rotation, _js2MoveDuration1)
+                .SetEase(Ease.InQuad).SetLink(_js2Object).WaitForCompletion();
+
+            // [2단계 이동/회전]
+            Debug.Log("[JumpScare] JS2 2단계 이동 시작");
+            _js2Object.transform.DOMove(_js2TargetPoint2.position, _js2MoveDuration2).SetEase(Ease.InQuad).SetLink(_js2Object);
+            yield return _js2Object.transform.DORotateQuaternion(_js2TargetPoint2.rotation, _js2MoveDuration2)
+                .SetEase(Ease.InQuad).SetLink(_js2Object).WaitForCompletion();
+
             if (anim != null) anim.enabled = true;
         }
 
-        /// <summary>
-        /// 시야가 0이 되었을 때 실행할 랜덤 점프스케어를 결정합니다.
-        /// </summary>
-        private void TriggerRandomJumpScare()
-        {
-            if (_isScareTriggered) return;
-            _isScareTriggered = true;
-
-            // 현재는 첫 번째 점프스케어만 구현됨 (추후 랜덤 확장 가능)
-            int randomIndex = 1; 
-            
-            switch (randomIndex)
-            {
-                case 1:
-                    StartCoroutine(JumpScareRoutine1());
-                    break;
-            }
-        }
-
-        /// <summary>
-        /// 점프스케어 1: 정해진 위치에 딜러를 복제한 후 천천히 위로 올립니다.
-        /// </summary>
-        private IEnumerator JumpScareRoutine1()
-        {
-            if (_dealerPrefab == null || _js1StartPoint == null) yield break;
-
-            Debug.Log("[JumpScare] 점프스케어 1단계 시작!");
-
-            // 1. 딜러 복제
-            GameObject clone = Instantiate(_dealerPrefab, _js1StartPoint.position, _js1StartPoint.rotation);
-            
-            // 2. 애니메이터 설정 (필요 시 특정 공포 애니메이션 재생)
-            Animator anim = clone.GetComponent<Animator>();
-            if (anim != null)
-            {
-                anim.Play("Idle"); // 또는 공포용 상태 이름
-            }
-
-            // 3. 천천히 위로 이동
-            Vector3 targetPos = _js1StartPoint.position + Vector3.up * _js1UpAmount;
-            clone.transform.DOMove(targetPos, _js1Duration).SetEase(Ease.OutSine);
-
-            yield return new WaitForSeconds(_js1Duration);
-        }
-
-        /// <summary>
-        /// 게임 재시작 시 상태를 초기화합니다.
-        /// </summary>
         public void ResetAll()
         {
-            _isHiding = false;
             _isScareTriggered = false;
+
+            if (_jumpScareObject != null)
+            {
+                _jumpScareObject.transform.DOKill();
+                _jumpScareObject.transform.localPosition = _js1InitialLocalPos;
+                _jumpScareObject.transform.localEulerAngles = _js1InitialLocalEuler;
+                _jumpScareObject.SetActive(_js1InitialActive);
+            }
+
+            if (_js2Object != null)
+            {
+                _js2Object.transform.DOKill();
+                _js2Object.transform.localPosition = _js2InitialLocalPos;
+                _js2Object.transform.localEulerAngles = _js2InitialLocalEuler;
+                _js2Object.SetActive(_js2InitialActive);
+                
+                Animator anim = _js2Object.GetComponent<Animator>();
+                if (anim != null) anim.enabled = true;
+            }
         }
     }
 }

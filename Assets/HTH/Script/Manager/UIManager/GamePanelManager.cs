@@ -18,6 +18,9 @@ namespace HTH
         [Header("게임 버튼")]
         [SerializeField] private Button _hitButton;
         [SerializeField] private Button _stayButton;
+        // ─── 쿨타임 ──────────────────────────────────────────────
+        private bool _isButtonCooldown = false;
+        [SerializeField] private float _buttonCooldown = 0.5f;
 
         // ─── Inspector — Result ───────────────────────────────────
         [Header("Result 패널")]
@@ -53,16 +56,26 @@ namespace HTH
             _hitButton.onClick.RemoveAllListeners();
             _hitButton.onClick.AddListener(() =>
             {
+                if (_isButtonCooldown) return;
+                StartCoroutine(ButtonCooldown());
                 onHit?.Invoke();
                 AudioManager.instance.PlaySfx(AudioManager.Sfx.hit);
             });
             _stayButton.onClick.RemoveAllListeners();
             _stayButton.onClick.AddListener(() =>
             {
+                if (_isButtonCooldown) return;
+                StartCoroutine(ButtonCooldown());
                 onStand?.Invoke();
                 AudioManager.instance.PlaySfx(AudioManager.Sfx.stay);
             });
 
+        }
+        private IEnumerator ButtonCooldown()
+        {
+            _isButtonCooldown = true;
+            yield return new WaitForSeconds(_buttonCooldown);
+            _isButtonCooldown = false;
         }
 
         /// <summary>Hit / Stay 버튼을 활성화합니다.</summary>
@@ -96,10 +109,11 @@ namespace HTH
                 _gameOverImage?.gameObject.SetActive(true);
                 _fadeOverlay.gameObject.SetActive(false);
 
+                AudioManager.instance.PlaySfx(AudioManager.Sfx.Ending);
                 _videoPlayer?.Play(() =>
                 {
                     _pauseManager?.Unblock();
-                    AudioManager.instance.PlaySfx(AudioManager.Sfx.Ending);
+                    onRestart?.Invoke();
                 });
             });
 
@@ -109,7 +123,6 @@ namespace HTH
         IEnumerator ProceedToShowGameOver(Action onRestart)
         {
             yield return null;
-            //BindRestart(onRestart);
         }
 
         /// <summary>스테이지 클리어 패널을 표시합니다.</summary>

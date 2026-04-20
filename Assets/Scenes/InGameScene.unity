@@ -2423,7 +2423,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HTH.VisionManager
   _maxVision: 100
-  _visionLossOnLose: 100
+  _visionLossOnLose: 20
 --- !u!1 &405878379
 GameObject:
   m_ObjectHideFlags: 0
@@ -9765,6 +9765,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HTH.GamePanelManager
   _hitButton: {fileID: 1209193915}
   _stayButton: {fileID: 1533953345}
+  _buttonCooldown: 0.5
   _resultPanel: {fileID: 1990001811}
   _resultTitleText: {fileID: 1251067125}
   _resultExprText: {fileID: 350205679}

@@ -57,6 +57,21 @@ namespace JSG
                 // Ease.OutCubic이나 Ease.OutExpo를 사용해 끝이 날카로운 움직임을 줍니다.
                 transform.DOLocalRotateQuaternion(targetRotation, _flickDuration)
                     .SetEase(Ease.OutExpo);
+
+                int s = Random.Range(0, 4);
+
+                switch(s)
+                {
+                    case 0: AudioManager.instance.PlaySfx(AudioManager.Sfx.eye1); break;
+                    case 1: AudioManager.instance.PlaySfx(AudioManager.Sfx.eye2); break;
+                    case 2: AudioManager.instance.PlaySfx(AudioManager.Sfx.eye3); break;
+                    case 3: AudioManager.instance.PlaySfx(AudioManager.Sfx.eye4); break;
+                    
+                    default:
+                        break;
+                }
+                
+
             }
         }
 

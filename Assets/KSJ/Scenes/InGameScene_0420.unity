@@ -1790,19 +1790,31 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HTH.EyeSpawnManager
   _eyePrefab: {fileID: 166794, guid: e48ade8ddad7caf40a92f30d869204e3, type: 3}
-  _spawnPoint: {fileID: 595218872}
   _stagePoint: {fileID: 272142123}
   _losePoint: {fileID: 745042207}
-  _moveToStageDuration: 2
+  _spawnUpDuration: 1.5
   _moveBackDuration: 2
   _moveToLoseDuration: 1.5
-  _destroyWaitAfterLose: 0.9
-  _squashDuration: 0.1
-  _breakParticlePrefab: {fileID: 3305140459692206258, guid: 80a8f7e576edd4b4a846f28e4ae4bc86, type: 3}
   _dealerTransform: {fileID: 1435568636}
-  _dealerLosePoint: {x: 0.378, y: 1.693, z: 0.182}
   _dealerAnimator: {fileID: 1435568633}
-  _dealerLoseAnimTrigger: HitDown
+  _dealerIdleAnimTrigger: Idle
+  _dealerEyes: []
+  _dealerNormalLosePoint: {x: 0, y: 0, z: 0}
+  _dealerNormalLoseAnimTrigger: Trigger7
+  _destroyWaitAfterLose: 0.9
+  _shrinkDuration: 0.5
+  _breakParticlePrefab: {fileID: 3305140459692206258, guid: 80a8f7e576edd4b4a846f28e4ae4bc86, type: 3}
+  _dealerPreSpecialPoint: {fileID: 0}
+  _preSpecialMoveDuration: 2
+  _delayBeforeCameraTransition: 1
+  _mainGameCamera: {fileID: 0}
+  _reachOutCamera: {fileID: 0}
+  _dealerReachOutPoint: {fileID: 0}
+  _dealerReachOutAnimTrigger: ReachOut
+  _blackoutFadeTime: 0.5
+  _blackoutHoldTime: 1
+  _normalBlackoutDelay: 1.5
+  _specialBlackoutDelay: 4
 --- !u!4 &312765713
 Transform:
   m_ObjectHideFlags: 0
@@ -2097,6 +2109,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HTH.VisionManager
   _maxVision: 100
+  _visionLossOnLose: 10
 --- !u!1 &405878379
 GameObject:
   m_ObjectHideFlags: 0
@@ -5420,50 +5433,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 1d46fa85b03a97b40b0f79e946047897, type: 3}
   m_PrefabInstance: {fileID: 849739184}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &854451940
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 854451942}
-  - component: {fileID: 854451941}
-  m_Layer: 0
-  m_Name: AudioManager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &854451941
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 854451940}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 898fad6b51bc15f459ba56f0bcbaeb47, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AudioManager
---- !u!4 &854451942
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 854451940}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -2.58329, y: 2.44526, z: -1.96502}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &866197682
 GameObject:
   m_ObjectHideFlags: 0
@@ -8679,10 +8648,12 @@ MonoBehaviour:
   _resultCompareText: {fileID: 1096265423}
   _resultNextButton: {fileID: 2116540113}
   _resultNextButtonLabel: {fileID: 1683441895}
+  _pauseManager: {fileID: 0}
   _gameOverPanel: {fileID: 1786242391}
-  _gameOverTitleText: {fileID: 2106087664}
-  _gameOverDetailText: {fileID: 1596500042}
-  _gameOverRestartButton: {fileID: 1113169652}
+  _videoPlayer: {fileID: 0}
+  _gameOverImage: {fileID: 0}
+  _fadeOverlay: {fileID: 0}
+  _gameOverFadeDuration: 1
   _operatorChoicePanel: {fileID: 1284359628}
   _operatorDiscardButton: {fileID: 923857224}
 --- !u!4 &1247912525 stripped
@@ -9084,6 +9055,7 @@ GameObject:
   - component: {fileID: 1283517569}
   - component: {fileID: 1283517568}
   - component: {fileID: 1283517572}
+  - component: {fileID: 1283517573}
   m_Layer: 0
   m_Name: MainCamera
   m_TagString: MainCamera
@@ -9243,6 +9215,16 @@ MonoBehaviour:
       m_PostInfinity: 2
       m_RotationOrder: 4
   CustomBlends: {fileID: 0}
+--- !u!165 &1283517573
+AudioHighPassFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1283517567}
+  m_Enabled: 0
+  m_CutoffFrequency: 5000
+  m_HighpassResonanceQ: 1
 --- !u!1 &1284359628
 GameObject:
   m_ObjectHideFlags: 0
@@ -16590,6 +16572,63 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8528536769474779132, guid: 9724ddfba2adf104380d6554d8e0edf5, type: 3}
   m_PrefabInstance: {fileID: 6965207363097234535}
   m_PrefabAsset: {fileID: 0}
+--- !u!1001 &7319251673192554242
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 580655478925376150, guid: 01e192a4750be3b45a8d419a737ac931, type: 3}
+      propertyPath: m_Name
+      value: AudioManager
+      objectReference: {fileID: 0}
+    - target: {fileID: 1905256886175998472, guid: 01e192a4750be3b45a8d419a737ac931, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -2.58329
+      objectReference: {fileID: 0}
+    - target: {fileID: 1905256886175998472, guid: 01e192a4750be3b45a8d419a737ac931, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 2.44526
+      objectReference: {fileID: 0}
+    - target: {fileID: 1905256886175998472, guid: 01e192a4750be3b45a8d419a737ac931, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -1.96502
+      objectReference: {fileID: 0}
+    - target: {fileID: 1905256886175998472, guid: 01e192a4750be3b45a8d419a737ac931, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1905256886175998472, guid: 01e192a4750be3b45a8d419a737ac931, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1905256886175998472, guid: 01e192a4750be3b45a8d419a737ac931, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1905256886175998472, guid: 01e192a4750be3b45a8d419a737ac931, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1905256886175998472, guid: 01e192a4750be3b45a8d419a737ac931, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1905256886175998472, guid: 01e192a4750be3b45a8d419a737ac931, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1905256886175998472, guid: 01e192a4750be3b45a8d419a737ac931, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 01e192a4750be3b45a8d419a737ac931, type: 3}
 --- !u!1001 &7486189650106189268
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -17531,4 +17570,4 @@ SceneRoots:
   - {fileID: 1171679500}
   - {fileID: 81120484}
   - {fileID: 312765713}
-  - {fileID: 854451942}
+  - {fileID: 7319251673192554242}

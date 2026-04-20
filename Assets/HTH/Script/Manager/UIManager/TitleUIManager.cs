@@ -44,6 +44,7 @@ namespace HTH
 
         private void OnStartButtonClicked()
         {
+            AudioManager.instance.PlaySfx(AudioManager.Sfx.startButton);
             Debug.Log("[Title] Start Button Clicked. Transitioning to Game...");
             
             // 1. 타이틀 UI 숨기기

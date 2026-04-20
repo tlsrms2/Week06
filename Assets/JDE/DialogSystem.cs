@@ -1,128 +1,119 @@
 using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
-using System;
 using System.Collections;
 
+/// <summary>
+/// 딜러가 스테이지 중간에 룰을 설명하는 대사 UI를 담당.
+/// GameManager에서 ShowDialog(index)로 호출하고,
+/// Update에서 UpdateDialog()를 매 프레임 호출하면 됩니다.
+/// </summary>
 public class DialogSystem : MonoBehaviour
 {
-    [SerializeField]
-    private Speaker speaker;
-    [SerializeField]
-    private DialogData[] dialogs;
-    [SerializeField]
-    private int currentDialogIndex = -1;
-    [SerializeField]
-    private bool isAutoStart = true;
-    
-    private bool isFirst = true;
-    
-    [Header("Typing Effect Settings")]
+    [Header("References")]
+    [SerializeField] private DialogDatabase database;
+    [SerializeField] private TextMeshProUGUI textDialog;
+    [SerializeField] private GameObject arrowObject; // 대사 완료 시 표시되는 커서
+
+    [Header("Typing Effect")]
     [SerializeField] private bool useTypingEffect = true;
     [SerializeField] private float typingSpeed = 0.05f;
-    
-    private bool isTyping = false;
+
+    // ── 상태 ──────────────────────────────────────
+    private string[] currentLines;
+    private int currentIndex = -1;
+
+    private bool isActive   = false;
+    private bool isTyping   = false;
+    private bool isFirstFrame = false;
+
     private Coroutine typingCoroutine;
 
-    private void Awake()
+    // ── 공개 프로퍼티 ─────────────────────────────
+    public bool IsActive => isActive;
+
+    // ─────────────────────────────────────────────
+    private void Awake() => HideUI();
+
+    // ─────────────────────────────────────────────
+    // 외부 호출 API
+    // ─────────────────────────────────────────────
+
+    /// <summary>
+    /// 지정한 인덱스의 대사 시퀀스를 시작합니다.
+    /// GameManager 등에서 호출하세요.
+    /// </summary>
+    public void ShowDialog(int sequenceIndex)
     {
-        Setup();
+        if (!database.TryGetSequence(sequenceIndex, out DialogSequence seq)) return;
+
+        currentLines = seq.lines;
+        currentIndex = -1;
+        isActive     = true;
+        isFirstFrame = true;
+
+        ShowNextLine();
     }
 
-    private void Setup()
-    {
-        //대사 관련 UI모두 비활성화
-        SetActiveObjects(speaker, false);
-    }
-
-    // 외부(게임매니저 등)에서 새로운 다이얼로그 배열을 주입하고 시작할 때 호출할 수 있는 메서드
-    public void StartNewDialogs(DialogData[] newDialogs)
-    {
-        dialogs = newDialogs;
-        currentDialogIndex = -1;
-        isFirst = true;
-    }
-
+    /// <summary>
+    /// GameManager의 Update에서 매 프레임 호출.
+    /// 대사가 완전히 끝나면 true를 반환합니다.
+    /// </summary>
     public bool UpdateDialog()
     {
-        if (isFirst)
-        {
-            Setup();
-            currentDialogIndex = -1;
-            
-            if (isAutoStart) 
-            {
-                SetNextDialog();
-            }
-            isFirst = false;
-            return false; // 첫 프레임에는 입력을 처리하지 않음 (즉시 넘어감 방지)
-        }
+        if (!isActive) return false;
 
-        if (Input.GetMouseButtonDown(0))
+        // ShowDialog() 호출과 같은 프레임의 클릭 무시
+        if (isFirstFrame) { isFirstFrame = false; return false; }
+
+        if (!Input.GetMouseButtonDown(0)) return false;
+
+        if (isTyping)
         {
-            if (isTyping)
-            {
-                // 타이핑 연출 중 클릭 시 타이핑 스킵 후 전체 텍스트 즉시 출력
-                CompleteTyping();
-            }
-            else
-            {
-                // 대사가 남아있을 경우 다음 대사 진행
-                if (dialogs != null && dialogs.Length > currentDialogIndex + 1)
-                {
-                    SetNextDialog();
-                }
-                // 대사가 더 이상 없을 경우 모든 오브젝트를 비활성화 후 true 반환
-                else
-                {
-                    SetActiveObjects(speaker, false);
-                    isFirst = true; // 다음 스테이지를 위해 초기화
-                    return true;
-                }
-            }
+            // 타이핑 중 클릭 → 전체 텍스트 즉시 표시
+            CompleteTyping();
+        }
+        else if (currentIndex + 1 < currentLines.Length)
+        {
+            // 다음 대사
+            ShowNextLine();
+        }
+        else
+        {
+            // 모든 대사 종료
+            HideUI();
+            isActive = false;
+            return true;
         }
 
         return false;
     }
 
-    private void SetNextDialog()
-    {
-        currentDialogIndex++;
-        SetActiveObjects(speaker, true);
-        speaker.objectArrow.SetActive(false); // 텍스트가 다 나오기 전까지 화살표 숨김
+    // ─────────────────────────────────────────────
+    // 내부 로직
+    // ─────────────────────────────────────────────
 
-        if (typingCoroutine != null)
-        {
-            StopCoroutine(typingCoroutine);
-        }
+    private void ShowNextLine()
+    {
+        currentIndex++;
+        SetArrow(false);
+        textDialog.gameObject.SetActive(true);
+
+        if (typingCoroutine != null) StopCoroutine(typingCoroutine);
 
         if (useTypingEffect)
-        {
-            typingCoroutine = StartCoroutine(TypeText(dialogs[currentDialogIndex].dialogue));
-        }
+            typingCoroutine = StartCoroutine(TypeText(currentLines[currentIndex]));
         else
-        {
-            CompleteTyping();
-        }
-    }
-
-    private void SetActiveObjects(Speaker speaker, bool visible)
-    {
-        if (speaker.textDialog != null)
-            speaker.textDialog.gameObject.SetActive(visible);
-        
-        if (speaker.objectArrow != null)
-            speaker.objectArrow.SetActive(false);
+            InstantShow(currentLines[currentIndex]);
     }
 
     private IEnumerator TypeText(string text)
     {
         isTyping = true;
-        speaker.textDialog.text = "";
+        textDialog.text = "";
 
-        foreach (char c in text.ToCharArray())
+        foreach (char c in text)
         {
-            speaker.textDialog.text += c;
+            textDialog.text += c;
             yield return new WaitForSeconds(typingSpeed);
         }
 
@@ -131,35 +122,25 @@ public class DialogSystem : MonoBehaviour
 
     private void CompleteTyping()
     {
-        if (typingCoroutine != null)
-        {
-            StopCoroutine(typingCoroutine);
-            typingCoroutine = null;
-        }
+        if (typingCoroutine != null) { StopCoroutine(typingCoroutine); typingCoroutine = null; }
+        InstantShow(currentLines[currentIndex]);
+    }
 
-        if (dialogs != null && currentDialogIndex >= 0 && currentDialogIndex < dialogs.Length)
-        {
-            speaker.textDialog.text = dialogs[currentDialogIndex].dialogue;
-        }
-
-        if (speaker.objectArrow != null)
-            speaker.objectArrow.SetActive(true);
-            
+    private void InstantShow(string text)
+    {
+        textDialog.text = text;
+        SetArrow(true);
         isTyping = false;
     }
-}
 
+    private void HideUI()
+    {
+        if (textDialog != null) textDialog.gameObject.SetActive(false);
+        SetArrow(false);
+    }
 
-[System.Serializable]
-public struct Speaker
-{
-    public TextMeshProUGUI textDialog;
-    public GameObject objectArrow; //대사 완료시 출력되는 커서 오브젝트
-}
-
-[System.Serializable]
-public struct DialogData
-{
-    public Speaker speaker;
-    public string dialogue;
+    private void SetArrow(bool visible)
+    {
+        if (arrowObject != null) arrowObject.SetActive(visible);
+    }
 }

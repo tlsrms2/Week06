@@ -72,6 +72,7 @@ Assets/HTH/Script/
  Manager/GameManager/
   BlackJackManager.cs
   DealerManager.cs
+  EyeSpawnManager.cs
   GameManager.cs
   PlayerHandManager.cs
   StageManager.cs
@@ -93,6 +94,8 @@ Assets/HTH/Script/
 Assets/JSG/Anim/
  AnimationTriggerController.cs
  DealerSequenceController.cs
+ EyeAnimation.cs
+ EyeFlickerAnimation.cs
 Assets/KSJ/
  CardDealManager.cs
  CardFlip.cs

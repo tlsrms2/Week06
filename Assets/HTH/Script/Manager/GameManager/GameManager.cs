@@ -95,7 +95,7 @@ namespace HTH
 
         private void Start()
         {
-            //AudioManager.instance.PlayBgm(true);
+            AudioManager.instance.PlayBgm(AudioManager.Bgm.ingame);
             TransitionTo(GameState.Title);
         }
 
@@ -149,7 +149,7 @@ namespace HTH
         {
             var stage = _stageManager.CurrentStage;
             if (_visionManager.CurrentVision <= 0)
-            {
+            { 
                 TransitionTo(GameState.GameOver);
                 return;
             }

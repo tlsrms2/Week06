@@ -264,6 +264,7 @@ namespace HTH
 
         private void OnHit()
         {
+            if (_playerHandManager.HasHandCard) return;
             if (_isProcessingHit || (Time.time < _lastHitTime + _hitCooldown)) return;
             
             _lastHitTime = Time.time;
@@ -322,7 +323,7 @@ namespace HTH
                         _gameUI?.EnableHandCardDrag(); // UI 패널 대신 드래그 활성화
                         
                         _isProcessingHit = false;
-                        _gameUI?.EnableGameButtons();
+                        // 조커가 손패에 들어왔으므로 버튼을 활성화하지 않고 종료
                         yield break;
                     }
                 }
@@ -349,7 +350,7 @@ namespace HTH
             {
                 _gameUI?.DisableGameButtons();
             }
-            else
+            else if (!_playerHandManager.HasHandCard)
             {
                 _gameUI?.EnableGameButtons();
             }
@@ -367,7 +368,7 @@ namespace HTH
             _gameUI.ShowAceChoice(() => { entry.data.SetAceValue(1); resolved = true; }, () => { entry.data.SetAceValue(11); resolved = true; });
             yield return new WaitUntil(() => resolved);
             _gameUI.SetupGameButtons(OnHit, OnStand);
-            if (disableButtons) _gameUI.DisableGameButtons();
+            if (disableButtons || _playerHandManager.HasHandCard) _gameUI.DisableGameButtons();
         }
 
         private void ExitPlayerTurn()
@@ -384,6 +385,7 @@ namespace HTH
 
         private void OnStand()
         {
+            if (_playerHandManager.HasHandCard) return;
             if (_playerHandManager.Field.Count == 0) return;
             ExitPlayerTurn();
             StartCoroutine(DelayedTransition(_standDelay, GameState.DealerTurn));

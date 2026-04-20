@@ -193,7 +193,7 @@ namespace HTH
             bool win = _blackjackManager.JudgeResult(playerTotal, dealerTotal, stage);
 
             if (win) _visionManager.WinBet();
-            else _visionManager.LoseBet();
+            else _visionManager.LoseBet(false);
 
             if (win)
             {

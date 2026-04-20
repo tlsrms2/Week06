@@ -46,6 +46,10 @@ public class AnimationTriggerController : MonoBehaviour
         {
             PlayAnimationAndMove(6, "HitDown", 7);
         }
+        else if (Input.GetKeyDown(KeyCode.Alpha8))
+        {
+            PlayAnimationAndMove(7, "ReachOut", 8);
+        }
     }
 
     // 애니메이션 실행과 위치 이동을 동시에 처리하는 함수

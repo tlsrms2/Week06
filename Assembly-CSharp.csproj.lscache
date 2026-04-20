@@ -92,20 +92,22 @@ Assets/HTH/Script/
  Rule/
   ExpressionEvaluator.cs
   OperatorSlot3D.cs
-Assets/JSG/Anim/
- AnimationTriggerController.cs
- DealerSequenceController.cs
- EyeAnimation.cs
- EyeFlickerAnimation.cs
-Assets/KSJ/
- CardDealManager.cs
- CardFlip.cs
- VignetteTest.cs
-Assets/Package/Package_AlchemistHouse/Scripts/
- FreeCamera.cs
- VolumetricLight.cs
- VolumetricLightRenderer.cs
-Assets/TutorialInfo/Scripts/Readme.cs
+Assets/
+ JDE/DialogSystem.cs
+ JSG/Anim/
+  AnimationTriggerController.cs
+  DealerSequenceController.cs
+  EyeAnimation.cs
+  EyeFlickerAnimation.cs
+ KSJ/
+  CardDealManager.cs
+  CardFlip.cs
+  VignetteTest.cs
+ Package/Package_AlchemistHouse/Scripts/
+  FreeCamera.cs
+  VolumetricLight.cs
+  VolumetricLightRenderer.cs
+ TutorialInfo/Scripts/Readme.cs
 Temp/obj/Assembly-CSharp/.NETStandard,Version=v2.1.AssemblyAttributes.cs
 
 [metadataReferences]

@@ -238,8 +238,21 @@ namespace HTH
         private void OnEnterGameOver() => UI_ShowGameOver(OnRestartGame);
         private void OnEnterStageClear()
         {
-            if (SceneLoadManager.Instance != null) SceneLoadManager.Instance.LoadEnding();
-            else UI_ShowStageClear(OnRestartGame);
+            if (_dialogSystem != null)
+            {
+                _dialogSystem.ShowDialog(4);
+                StartCoroutine(WaitDialogAndLoadGame());
+            }
+            else
+            {
+                SceneLoadManager.Instance.LoadGame();
+            }
+        }
+
+        private IEnumerator WaitDialogAndLoadGame()
+        {
+            yield return new WaitUntil(() => !_dialogSystem.IsActive);
+            SceneLoadManager.Instance.LoadGame();
         }
 
         // ─── UI 호출 관련 ──────────────────────────────────────────

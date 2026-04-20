@@ -511,7 +511,17 @@ namespace HTH
             }
         }
 
-        private void OnRestartGame() => TransitionTo(GameState.Title);
+        private void OnRestartGame()
+        {
+            if (SceneLoadManager.Instance != null)
+            {
+                SceneLoadManager.Instance.LoadGame();
+            }
+            else
+            {
+                UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
+            }
+        }
 
         private void LoadStage()
         {

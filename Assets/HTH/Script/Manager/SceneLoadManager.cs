@@ -1,12 +1,13 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections;
+using System;
+using Unity.Cinemachine;
 
 namespace HTH
 {
     /// <summary>
-    /// 씬 전환을 관리하는 싱글톤 매니저입니다.
-    /// DontDestroyOnLoad를 통해 씬이 바뀌어도 유지됩니다.
+    /// 씬 전환 및 카메라 트랜지션을 관리하는 싱글톤 매니저입니다.
     /// </summary>
     public class SceneLoadManager : MonoBehaviour
     {
@@ -18,10 +19,10 @@ namespace HTH
         public string endingSceneName = "EndingScene";
 
         [Header("Fade Settings")]
-        [SerializeField] private float _fadeDuration = 1f; // 페이드 아웃 2초, 페이드 인 2초
+        [SerializeField] private float _fadeDuration = 1f;
 
         private CanvasGroup _fadeCanvasGroup;
-        private bool _isFading = false;
+        private bool _isTransitioning = false;
 
         private void Awake()
         {
@@ -37,9 +38,6 @@ namespace HTH
             }
         }
 
-        /// <summary>
-        /// 페이드 효과를 위한 캔버스 및 이미지를 동적으로 생성하여 화면을 꽉 채웁니다.
-        /// </summary>
         private void CreateFadeCanvas()
         {
             GameObject fadeObj = new GameObject("FadeCanvas");
@@ -64,7 +62,6 @@ namespace HTH
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
-            rect.localPosition = Vector3.zero;
 
             _fadeCanvasGroup = fadeObj.AddComponent<CanvasGroup>();
             _fadeCanvasGroup.alpha = 0f;
@@ -74,13 +71,51 @@ namespace HTH
         public void LoadGame() => StartCoroutine(FadeRoutine(inGameSceneName));
         public void LoadTitle() => StartCoroutine(FadeRoutine(titleSceneName));
         public void LoadEnding() => StartCoroutine(FadeRoutine(endingSceneName));
+
+        /// <summary>
+        /// 시네머신 카메라 블렌딩을 이용해 타이틀에서 인게임으로 부드럽게 전환합니다.
+        /// </summary>
+        public void StartGameWithCameraTransition(CinemachineCamera titleCam, CinemachineCamera gameCam, Action onComplete = null)
+        {
+            if (_isTransitioning) return;
+            StartCoroutine(CameraTransitionRoutine(titleCam, gameCam, onComplete));
+        }
         
+        private IEnumerator CameraTransitionRoutine(CinemachineCamera titleCam, CinemachineCamera gameCam, Action onComplete)
+        {
+            _isTransitioning = true;
+
+            // 1. 카메라 우선순위 변경하여 블렌딩 시작
+            if (titleCam != null) titleCam.Priority = 0;
+            if (gameCam != null) gameCam.Priority = 10;
+
+            // 2. 시네머신 브레인이 블렌딩 중인지 확인 (혹은 고정 시간 대기)
+            // CinemachineBrain을 찾아 블렌딩 종료를 기다립니다.
+            var brain = Camera.main.GetComponent<CinemachineBrain>();
+            if (brain != null)
+            {
+                // 블렌딩이 시작될 때까지 한 프레임 대기
+                yield return null;
+                while (brain.IsBlending)
+                {
+                    yield return null;
+                }
+            }
+            else
+            {
+                // 브레인을 못 찾을 경우 기본 2초 대기
+                yield return new WaitForSeconds(2f);
+            }
+
+            _isTransitioning = false;
+            onComplete?.Invoke();
+        }
+
         private IEnumerator FadeRoutine(string sceneName)
         {
-            if (_isFading) yield break;
-            _isFading = true;
+            if (_isTransitioning) yield break;
+            _isTransitioning = true;
 
-            // Fade Out (검은색으로)
             _fadeCanvasGroup.blocksRaycasts = true;
             float elapsed = 0f;
             while (elapsed < _fadeDuration)
@@ -91,17 +126,11 @@ namespace HTH
             }
             _fadeCanvasGroup.alpha = 1f;
 
-            // Scene Load
             AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(sceneName);
-            while (!asyncLoad.isDone)
-            {
-                yield return null;
-            }
+            while (!asyncLoad.isDone) yield return null;
 
-            // 잠시 대기 (로딩 완료 후 안정화)
             yield return new WaitForSeconds(0.1f);
 
-            // Fade In (투명하게)
             elapsed = 0f;
             while (elapsed < _fadeDuration)
             {
@@ -112,7 +141,7 @@ namespace HTH
             _fadeCanvasGroup.alpha = 0f;
             _fadeCanvasGroup.blocksRaycasts = false;
 
-            _isFading = false;
+            _isTransitioning = false;
         }
 
         public void QuitGame()

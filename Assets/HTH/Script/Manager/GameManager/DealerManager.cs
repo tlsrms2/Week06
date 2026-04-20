@@ -127,6 +127,13 @@ namespace HTH
             // 딜러 카드 드로우 루프
             while (true)
             {
+                // 한 줄에 10장씩, 최대 2줄(20장)까지만 배치하도록 제한
+                if (Field.Count >= 20)
+                {
+                    Debug.Log("[Dealer] 필드 가득 참 (20장) — 드로우 중단");
+                    break;
+                }
+
                 // 1. 손패 연산자 최적 배치
                 if (stage.useOperatorCards && Hand.Count > 0)
                     TryAutoPlaceOperator(stage);

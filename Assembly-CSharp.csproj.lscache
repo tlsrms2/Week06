@@ -72,6 +72,7 @@ Assets/HTH/Script/
  Manager/GameManager/
   BlackJackManager.cs
   DealerManager.cs
+  EyeSpawnManager.cs
   GameManager.cs
   PlayerHandManager.cs
   StageManager.cs
@@ -93,6 +94,8 @@ Assets/HTH/Script/
 Assets/JSG/Anim/
  AnimationTriggerController.cs
  DealerSequenceController.cs
+ EyeAnimation.cs
+ EyeFlickerAnimation.cs
 Assets/KSJ/
  CardDealManager.cs
  CardFlip.cs
@@ -388,6 +391,8 @@ Library/ScriptAssemblies/
  Unity.AI.Navigation.Updater.dll
  Unity.Burst.dll
  Unity.Burst.Editor.dll
+ Unity.Cinemachine.dll
+ Unity.Cinemachine.Editor.dll
  Unity.Collections.dll
  Unity.Collections.Editor.dll
  Unity.InputSystem.dll
@@ -417,7 +422,10 @@ Library/ScriptAssemblies/
  Unity.RenderPipelines.Universal.Shaders.dll
  Unity.Rider.Editor.dll
  Unity.Searcher.Editor.dll
+ Unity.Settings.Editor.dll
  Unity.ShaderGraph.Editor.dll
+ Unity.Splines.dll
+ Unity.Splines.Editor.dll
  Unity.TextMeshPro.dll
  Unity.TextMeshPro.Editor.dll
  Unity.Timeline.dll

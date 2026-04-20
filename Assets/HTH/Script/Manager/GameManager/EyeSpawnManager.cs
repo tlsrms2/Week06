@@ -93,12 +93,9 @@ namespace HTH
 
         public void OnWin(Action onComplete = null)
         {
-            if (_currentEye == null || _stagePoint == null) { onComplete?.Invoke(); return; }
-            _currentEye.transform.DOScaleY(0f, _moveBackDuration).SetEase(Ease.InCubic).SetLink(_currentEye).OnComplete(() =>
-            {
-                if (_currentEye != null) Destroy(_currentEye);
-                onComplete?.Invoke();
-            });
+            // [수정] 승리 시에는 눈알을 부수거나 사라지게 하지 않고 그대로 둡니다.
+            // 바로 다음 로직(카드 수거 등)으로 넘어가도록 콜백만 즉시 실행합니다.
+            onComplete?.Invoke();
         }
 
         public void OnLose(Action onComplete = null)

@@ -55,6 +55,8 @@ namespace HTH
         public void SetStageInfo(int stageIndex, long bustValue)
             => _hudManager.SetStageInfo(stageIndex, bustValue);
 
+        public int MaxCardsPerRow => _fieldManager.MaxCardsPerRow;
+
         /// <summary>플레이어 현재 값을 갱신합니다.</summary>
         public void UpdatePlayerValue(List<CardDataSO> field, StageDataSO stage)
             => _hudManager.UpdatePlayerValue(field, stage);

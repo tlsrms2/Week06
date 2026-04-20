@@ -1,16 +1,22 @@
-﻿namespace HTH
+namespace HTH
 {
     /// <summary>
     /// 블랙잭 딜러 AI.
     ///
-    /// 1단계 : bustValue의 80% 미만이면 히트
-    /// 2단계 : 사칙연산 스테이지에서도 동일 기준 적용
-    ///   - bustValue가 달라도 80% 미만이면 히트
-    ///   - 연산자 배치는 DealerManager가 담당
+    /// 드로우 판단 기준: 동적 안전 마진(Safe Margin) 방식
+    ///   - standThreshold = bustValue - 평균 카드값(5.5)
+    ///   - currentTotal < standThreshold 이면 히트
+    ///   - 예: bustValue=21 → 15.5 미만이면 히트(≤15 히트, 16 이상 스탠드)
+    ///   - 예: bustValue=50 → 44.5 미만이면 히트(≤44 히트, 45 이상 스탠드)
+    ///   - 연산자 배치는 DealerManager가 Brute-Force로 담당
     /// </summary>
     public class DealerAI : IDealerStrategy
     {
         private long _bustThreshold = 21;
+
+        // 덱에 남아있는 숫자 카드의 평균값 가정 (1~10 균등 분포 → 5.5)
+        private const float AverageCardValue = 5.5f;
+
         public long BustThreshold => _bustThreshold;
 
         public void SetBustThreshold(long threshold)
@@ -18,33 +24,27 @@
 
         /// <summary>
         /// 딜러 히트 여부를 판단합니다.
-        /// bustValue의 80% 미만이면 히트합니다.
-        /// bustValue 초과 시 이미 버스트이므로 히트 불필요.
         ///
-        /// bustValue = 21 → 16 미만이면 히트
-        /// bustValue = 50 → 40 미만이면 히트
-        /// bustValue = 10 → 8  미만이면 히트
+        /// standThreshold = bustValue - AverageCardValue(5.5)
+        /// currentTotal < standThreshold 이면 히트, 이상이면 스탠드.
+        ///
+        /// bustValue = 21 → standThreshold ≈ 15.5 → 15 이하만 히트
+        /// bustValue = 50 → standThreshold ≈ 44.5 → 44 이하만 히트
         /// </summary>
         public bool ShouldHit(long currentTotal, StageDataSO stage = null)
         {
             long bustValue = stage?.bustValue ?? _bustThreshold;
 
-            if (stage == null)
-                return currentTotal < (long)(bustValue * 0.8f);
+            if (currentTotal > bustValue) return false;
 
-            if (stage.normalJudge)
-            {
-                // 기본 — 버스트면 히트 불필요
-                if (currentTotal > bustValue) return false;
-                return currentTotal < (long)(bustValue * 0.8f);
-            }
-            else
-            {
-                // 리버스 — 버스트면 히트 불필요
-                if (currentTotal < bustValue) return false;
-                // bustValue의 120% 초과면 히트 (값을 낮춰야 하므로)
-                return currentTotal > (long)(bustValue * 1.2f);
-            }
+            float standThreshold = bustValue - AverageCardValue;
+            bool hit = currentTotal < standThreshold;
+
+            UnityEngine.Debug.Log(
+                $"[DealerAI] total:{currentTotal} target:{bustValue} " +
+                $"standThreshold:{standThreshold:F1} → {(hit ? "HIT" : "STAND")}");
+
+            return hit;
         }
 
         public string GetResultDescription(

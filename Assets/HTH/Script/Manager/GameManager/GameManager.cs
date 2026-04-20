@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace HTH
@@ -18,22 +19,16 @@ namespace HTH
     /// 블라인드잭 게임의 상태 머신 허브입니다.
     /// 직접 게임 로직을 처리하지 않고 하위 Manager에 위임하며
     /// 상태 전환과 UI 프록시 호출만 담당합니다.
-    ///
-    /// 상태 흐름:
-    /// Title → Betting → PlayerTurn → DealerTurn → Result
-    ///                                                ├─ 승리 → 다음 스테이지 Betting
-    ///                                                ├─ 패배 → 재도전 Betting
-    ///                                                └─ 시야 소진 → GameOver
     /// </summary>
     public class GameManager : MonoBehaviour
     {
         // ─── Inspector ───────────────────────────────────────────
         [Header("데이터")]
-        [Tooltip("전체 스테이지 목록 SO — 스테이지 추가 시 여기에만 드래그")]
+        [Tooltip("전체 스테이지 목록 SO")]
         [SerializeField] private StageRegistrySO _stageRegistry;
 
         [Header("UI")]
-        [Tooltip("GameUIManager — 미연결 시 Console 로그로 자동 진행")]
+        [Tooltip("GameUIManager")]
         [SerializeField] private GameUIManager _gameUI;
 
         // ─── 하위 Manager 참조 ───────────────────────────────────
@@ -48,12 +43,13 @@ namespace HTH
         // ─── 상태 ─────────────────────────────────────────────────
         private GameState _state;
         private int _hitCount = 0;
+        private bool _isProcessingHit = false; // 중복 드로우 방지 플래그
 
-        // operatorOnlyHit 스테이지 — 연산자 카드 임시 보관용
         private readonly List<DeckSO.CardEntry> _pendingOperators = new();
 
-        // ─── 연출 지연 시간 ───────────────────────────────────────
         [Header("연출 지연 시간")]
+        [SerializeField] private float _dealInterval = 0.5f;
+        [SerializeField] private float _hitCooldown = 1f;
         [SerializeField] private float _bustDelay = 1.5f;
         [SerializeField] private float _standDelay = 1.0f;
         [SerializeField] private float _resultDelay = 1.5f;
@@ -62,11 +58,20 @@ namespace HTH
 
         private void Awake()
         {
-            _stageManager = gameObject.AddComponent<StageManager>();
-            _blackjackManager = gameObject.AddComponent<BlackjackManager>();
-            _playerHandManager = gameObject.AddComponent<PlayerHandManager>();
-            _dealerManager = gameObject.AddComponent<DealerManager>();
-            _visionManager = gameObject.AddComponent<VisionManager>();
+            _stageManager = Object.FindAnyObjectByType<StageManager>();
+            if (_stageManager == null) _stageManager = gameObject.AddComponent<StageManager>();
+
+            _blackjackManager = Object.FindAnyObjectByType<BlackjackManager>();
+            if (_blackjackManager == null) _blackjackManager = gameObject.AddComponent<BlackjackManager>();
+
+            _playerHandManager = Object.FindAnyObjectByType<PlayerHandManager>();
+            if (_playerHandManager == null) _playerHandManager = gameObject.AddComponent<PlayerHandManager>();
+
+            _dealerManager = Object.FindAnyObjectByType<DealerManager>();
+            if (_dealerManager == null) _dealerManager = gameObject.AddComponent<DealerManager>();
+            
+            _visionManager = Object.FindAnyObjectByType<VisionManager>();
+            if (_visionManager == null) _visionManager = gameObject.AddComponent<VisionManager>();
 
             _stageManager.Initialize(_stageRegistry);
 
@@ -78,91 +83,34 @@ namespace HTH
             _playerHandManager.OnHandChanged += OnPlayerHandChanged;
             _playerHandManager.OnHandSelectionChanged += OnHandSelectionChanged;
             _playerHandManager.OnSlotHighlightRequested += OnSlotHighlightRequested;
+
             _dealerManager.OnDealerCardAdded += OnDealerCardAdded;
             _dealerManager.OnDealerTurnEnded += OnDealerTurnEnded;
             _dealerManager.OnDealerCardRevealed += OnDealerCardRevealed;
+            _dealerManager.OnDealerOperatorPlaced += OnDealerOperatorPlaced;
         }
 
         private void Start() => TransitionTo(GameState.Title);
 
+        private float _lastHitTime = -1f;
+
         private void OnDestroy()
         {
-            _visionManager.OnVisionDepleted -= OnVisionDepleted;
-            _playerHandManager.OnFieldChanged -= OnPlayerFieldChanged;
-            _playerHandManager.OnHandChanged -= OnPlayerHandChanged;
-            _playerHandManager.OnHandSelectionChanged -= OnHandSelectionChanged;
-            _playerHandManager.OnSlotHighlightRequested -= OnSlotHighlightRequested;
-            _dealerManager.OnDealerCardAdded -= OnDealerCardAdded;
-            _dealerManager.OnDealerTurnEnded -= OnDealerTurnEnded;
-            _dealerManager.OnDealerCardRevealed -= OnDealerCardRevealed;
-        }
-
-        // ─── UI 프록시 ────────────────────────────────────────────
-
-        private void UI_ShowTitle(System.Action onStart)
-        {
-            Debug.Log("[GM] ShowTitle — 자동 진행");
-            onStart?.Invoke();
-        }
-
-        private void UI_ShowBetting(int currentBet, System.Action<int> onConfirm)
-        {
-            if (_gameUI != null)
+            if (_visionManager != null) _visionManager.OnVisionDepleted -= OnVisionDepleted;
+            if (_playerHandManager != null)
             {
-                _gameUI.SetupBetting(
-                    _stageManager.CurrentStage.visionBetMin,
-                    _visionManager.CurrentVision,
-                    onConfirm);
-                return;
+                _playerHandManager.OnFieldChanged -= OnPlayerFieldChanged;
+                _playerHandManager.OnHandChanged -= OnPlayerHandChanged;
+                _playerHandManager.OnHandSelectionChanged -= OnHandSelectionChanged;
+                _playerHandManager.OnSlotHighlightRequested -= OnSlotHighlightRequested;
             }
-            Debug.Log($"[GM] ShowBetting — 자동 확정:{currentBet}");
-            onConfirm?.Invoke(currentBet);
-        }
-
-        private void UI_ShowPlayerTurn()
-        {
-            if (_gameUI != null)
+            if (_dealerManager != null)
             {
-                _gameUI.SetStageInfo(
-                    _stageManager.CurrentStage.stageIndex,
-                    _stageManager.CurrentStage.bustValue);
-                _gameUI.SetupGameButtons(OnHit, OnStand);
-                return;
+                _dealerManager.OnDealerCardAdded -= OnDealerCardAdded;
+                _dealerManager.OnDealerTurnEnded -= OnDealerTurnEnded;
+                _dealerManager.OnDealerCardRevealed -= OnDealerCardRevealed;
+                _dealerManager.OnDealerOperatorPlaced -= OnDealerOperatorPlaced;
             }
-            Debug.Log("[GM] ShowPlayerTurn — 자동 Stand");
-            OnStand();
-        }
-
-        private void UI_ShowResult(string desc, bool win, System.Action onNext)
-        {
-            if (_gameUI != null)
-            {
-                long playerTotal = _blackjackManager.EvaluatePlayer(
-                    _playerHandManager.FieldData, _stageManager.CurrentStage);
-                long dealerTotal = _blackjackManager.EvaluateDealer(
-                    _dealerManager.FieldData, _stageManager.CurrentStage);
-
-                _gameUI.ShowResult(
-                    desc, win,
-                    playerTotal, dealerTotal,
-                    _stageManager.CurrentStage.bustValue,
-                    onNext);
-                return;
-            }
-            Debug.Log($"[GM] ShowResult — {desc} win:{win}");
-            onNext?.Invoke();
-        }
-
-        private void UI_ShowGameOver(System.Action onRestart)
-        {
-            if (_gameUI != null) { _gameUI.ShowGameOver(onRestart); return; }
-            Debug.Log("[GM] ShowGameOver");
-        }
-
-        private void UI_ShowStageClear(System.Action onRestart)
-        {
-            if (_gameUI != null) { _gameUI.ShowStageClear(onRestart); return; }
-            Debug.Log("[GM] ShowStageClear");
         }
 
         // ─── 상태 전환 ────────────────────────────────────────────
@@ -175,10 +123,7 @@ namespace HTH
                 case GameState.Title: OnEnterTitle(); break;
                 case GameState.Betting: OnEnterBetting(); break;
                 case GameState.PlayerTurn: OnEnterPlayerTurn(); break;
-                case GameState.DealerTurn:
-                    StartCoroutine(_dealerManager.RunTurn(
-                        _deckRunner, _dealerStrategy,
-                        _stageManager.CurrentStage)); break;
+                case GameState.DealerTurn: StartCoroutine(_dealerManager.RunTurn(_deckRunner, _dealerStrategy, _stageManager.CurrentStage)); break;
                 case GameState.Result: OnEnterResult(); break;
                 case GameState.GameOver: OnEnterGameOver(); break;
                 case GameState.StageClear: OnEnterStageClear(); break;
@@ -196,12 +141,16 @@ namespace HTH
 
         private void OnEnterBetting()
         {
-            if (!_visionManager.CanBet(_stageManager.CurrentStage.visionBetMin))
+            var stage = _stageManager.CurrentStage;
+            if (!_visionManager.CanBet(stage.visionBetMin))
             {
                 TransitionTo(GameState.GameOver);
                 return;
             }
-            UI_ShowBetting(_stageManager.CurrentStage.visionBetMin, OnConfirmBet);
+            
+            // 스테이지의 최대 베팅 제한과 현재 시야 중 작은 값을 한도로 설정
+            int betMax = Mathf.Min(stage.visionBetMax, _visionManager.CurrentVision);
+            UI_ShowBetting(stage.visionBetMin, betMax, OnConfirmBet);
         }
 
         private void OnEnterPlayerTurn()
@@ -209,148 +158,122 @@ namespace HTH
             if (_dealerStrategy is DealerAI ai)
                 ai.SetBustThreshold(_stageManager.CurrentStage.bustValue);
 
-            _gameUI?.EnableGameButtons();
+            _gameUI?.DisableGameButtons();
             _gameUI?.ClearDealerValue();
-
-            // ← 변경 — Refresh 대신 ClearAllFields 후 초기 딜링
-            // 초기 딜링에서 AddPlayerFieldCard / AddDealerFieldCard가 호출됨
+            _gameUI?.ClearPlayerValue();
             _gameUI?.ClearAllFields();
 
-            DealInitialCards();
+            _lastHitTime = -1f;
+            StartCoroutine(DealInitialAndEnable());
 
             if (_gameUI != null)
             {
                 _gameUI.OnHandCardClicked += _playerHandManager.SelectHandCard;
-                _gameUI.OnOperatorSlotClicked += OnOperatorSlotSelected;
+                _gameUI.OnOperatorDropped += OnOperatorDropped;
             }
 
             UI_ShowPlayerTurn();
         }
 
-        // ─── 초기 딜링 ────────────────────────────────────────────
-
-        private void DealInitialCards()
+        private IEnumerator DealInitialAndEnable()
         {
-            if (_stageManager.CurrentStage.operatorOnlyHit)
-            {
-                DealAllNumberCards();
-                return;
-            }
-
-            if (_deckRunner.TryDraw(out DeckSO.CardEntry p1))
-                _playerHandManager.AddNumberToField(p1);
-
-            if (_deckRunner.TryDraw(out DeckSO.CardEntry d1))
-                _dealerManager.AddOpenCard(d1);
-
-            if (_deckRunner.TryDraw(out DeckSO.CardEntry p2))
-                _playerHandManager.AddNumberToField(p2);
-
-            if (_deckRunner.TryDraw(out DeckSO.CardEntry d2))
-                _dealerManager.SetHiddenCard(d2);
-        }
-
-        private void DealAllNumberCards()
-        {
-            while (_deckRunner.Remaining > 0)
-            {
-                if (!_deckRunner.TryDraw(out DeckSO.CardEntry entry)) break;
-
-                if (entry.data.cardType == CardType.Number)
-                    _playerHandManager.AddNumberToField(entry);
-                else
-                    _pendingOperators.Add(entry);
-            }
-
-            foreach (var op in _pendingOperators)
-                _deckRunner.ReturnCard(op);
-            _pendingOperators.Clear();
-        }
-
-        private DeckSO.CardEntry DrawNumberCard(int maxRetry = 20)
-        {
-            for (int i = 0; i < maxRetry; i++)
-            {
-                if (!_deckRunner.TryDraw(out DeckSO.CardEntry entry))
-                {
-                    Debug.LogWarning("[GM] DrawNumberCard — 덱 소진");
-                    return null;
-                }
-                if (entry.data.cardType == CardType.Number)
-                    return entry;
-            }
-            return null;
-        }
-
-        private void ExitPlayerTurn()
-        {
-            if (_gameUI != null)
-            {
-                _gameUI.OnHandCardClicked -= _playerHandManager.SelectHandCard;
-                _gameUI.OnOperatorSlotClicked -= OnOperatorSlotSelected;
-                _gameUI.DisableGameButtons();
-            }
-            _playerHandManager.ClearSelection();
+            yield return StartCoroutine(DealInitialCardsRoutine());
+            _gameUI?.EnableGameButtons();
         }
 
         private void OnEnterResult()
         {
             var stage = _stageManager.CurrentStage;
-            long playerTotal = _blackjackManager.EvaluatePlayer(
-                _playerHandManager.FieldData, stage);
-            long dealerTotal = _blackjackManager.EvaluateDealer(
-                _dealerManager.FieldData, stage);
+            long playerTotal = _blackjackManager.EvaluatePlayer(_playerHandManager.FieldData, stage);
+            long dealerTotal = _blackjackManager.EvaluateDealer(_dealerManager.FieldData, stage);
 
             bool win = _blackjackManager.JudgeResult(playerTotal, dealerTotal, stage);
-            string desc = _blackjackManager.BuildResultDescription(
-                playerTotal, dealerTotal, stage, win);
-            string exprStr = ExpressionEvaluator.ToExpressionString(
-                _playerHandManager.FieldData);
 
             if (win) _visionManager.WinBet();
             else _visionManager.LoseBet();
 
-            Debug.Log($"[GM] Result — player:{playerTotal:N0} dealer:{dealerTotal:N0} win:{win}");
-
-            System.Action onNext = win
-                ? (System.Action)OnStageWin
-                : OnStageLose;
-
-            UI_ShowResult($"{exprStr} = {playerTotal:N0}", win, onNext);
+            if (win) OnStageWin();
+            else OnStageLose();
         }
 
         private void OnEnterGameOver() => UI_ShowGameOver(OnRestartGame);
-        private void OnEnterStageClear() => UI_ShowStageClear(OnRestartGame);
+        private void OnEnterStageClear()
+        {
+            if (SceneLoadManager.Instance != null) SceneLoadManager.Instance.LoadEnding();
+            else UI_ShowStageClear(OnRestartGame);
+        }
+
+        // ─── UI 호출 관련 ──────────────────────────────────────────
+
+        private void UI_ShowTitle(System.Action onStart)
+        {
+            if (_gameUI != null) _gameUI.SetupTitle(onStart);
+            else onStart?.Invoke();
+        }
+
+        private void UI_ShowBetting(int min, int max, System.Action<int> onConfirm)
+        {
+            if (_gameUI != null)
+            {
+                var stage = _stageManager.CurrentStage;
+                // 배팅 패널이 뜨기 전에 현재 스테이지 번호와 목표 수치를 HUD에 먼저 반영
+                _gameUI.SetStageInfo(stage.stageIndex, stage.bustValue);
+                // 베팅 매니저에게 필요한 정보(시야, 스테이지 정보 등)를 모두 전달
+                _gameUI.SetupBetting(min, max, _visionManager.CurrentVision, stage.stageIndex, stage.bustValue, onConfirm);
+            }
+            else onConfirm?.Invoke(min);
+        }
+
+        private void UI_ShowPlayerTurn()
+        {
+            if (_gameUI != null)
+            {
+                _gameUI.SetStageInfo(_stageManager.CurrentStage.stageIndex, _stageManager.CurrentStage.bustValue);
+                _gameUI.SetupGameButtons(OnHit, OnStand);
+                _gameUI.EnableHandCardDrag();
+            }
+        }
+
+        private void UI_ShowGameOver(System.Action onRestart) => _gameUI?.ShowGameOver(onRestart);
+        private void UI_ShowStageClear(System.Action onRestart) => _gameUI?.ShowStageClear(onRestart);
 
         // ─── 플레이어 액션 ────────────────────────────────────────
 
-        private void OnHit() => DrawAndProcess();
-
-        private void DrawAndProcess(int retryCount = 0)
+        private void OnHit()
         {
-            var stage = _stageManager.CurrentStage;
+            if (_isProcessingHit || (Time.time < _lastHitTime + _hitCooldown)) return;
+            
+            _lastHitTime = Time.time;
+            StartCoroutine(DrawAndProcess());
+        }
 
+        private IEnumerator DrawAndProcess(int retryCount = 0)
+        {
+            _isProcessingHit = true;
+            _gameUI?.DisableGameButtons(); // 드로우 중 버튼 비활성화
+
+            var stage = _stageManager.CurrentStage;
             if (stage.maxHitCount > 0 && _hitCount >= stage.maxHitCount)
             {
-                Debug.Log("[GM] 최대 Hit 횟수 도달 — Stand 전환");
+                _isProcessingHit = false;
                 OnStand();
-                return;
+                yield break;
             }
 
             if (retryCount > 10)
             {
-                Debug.LogWarning("[GM] DrawAndProcess — 재드로우 한도 초과");
+                _isProcessingHit = false;
                 ExitPlayerTurn();
                 TransitionTo(GameState.DealerTurn);
-                return;
+                yield break;
             }
 
             if (!_deckRunner.TryDraw(out DeckSO.CardEntry entry))
             {
-                Debug.Log("[GM] 덱 소진 — 딜러 턴 전환");
+                _isProcessingHit = false;
                 ExitPlayerTurn();
                 TransitionTo(GameState.DealerTurn);
-                return;
+                yield break;
             }
 
             if (entry.data.cardType == CardType.Number)
@@ -358,83 +281,111 @@ namespace HTH
                 if (stage.operatorOnlyHit)
                 {
                     _deckRunner.ReturnCard(entry);
-                    DrawAndProcess(retryCount + 1);
-                    return;
+                    yield return StartCoroutine(DrawAndProcess(retryCount + 1));
+                    yield break; // 내부에서 flag를 관리하므로 여기서 flag 리셋 불필요
                 }
-
                 _hitCount++;
 
-                // OnFieldChanged 이벤트 일시 차단
-                _playerHandManager.OnFieldChanged -= OnPlayerFieldChanged;
-                _playerHandManager.AddNumberToField(entry);
-
-                _gameUI?.AddPlayerFieldCard(entry);
-
-                bool bust = _blackjackManager.IsPlayerBust(_playerHandManager.FieldData, stage);
-
-                Debug.Log($"[GM] Hit — " +
-                          $"total:{_blackjackManager.EvaluatePlayer(_playerHandManager.FieldData, stage)} " +
-                          $"bust:{bust}");
-
-                if (bust)
+                bool shouldDrawOp = stage.useOperatorCards && stage.operatorCardRatio > 0f && _playerHandManager.CanReceiveOperatorCard && Random.value < stage.operatorCardRatio;
+                if (shouldDrawOp)
                 {
-                    // 버스트 — HUD 값 갱신 후 Result 전환
-                    _gameUI?.UpdatePlayerValue(_playerHandManager.FieldData, stage);
-                    _playerHandManager.OnFieldChanged += OnPlayerFieldChanged;
-                    ExitPlayerTurn();
-                    StartCoroutine(DelayedTransition(_bustDelay, GameState.Result));
-                    return;
+                    var opCards = stage.deck.operatorCards;
+                    if (opCards != null && opCards.Count > 0)
+                    {
+                        _deckRunner.ReturnCard(entry);
+                        var opData = opCards[Random.Range(0, opCards.Count)];
+                        var opEntry = new DeckSO.CardEntry { data = opData, suit = CardSuit.Spade };
+                        _playerHandManager.AddOperatorToHand(opEntry);
+                        _gameUI?.EnableHandCardDrag(); // UI 패널 대신 드래그 활성화
+                        
+                        _isProcessingHit = false;
+                        _gameUI?.EnableGameButtons();
+                        yield break;
+                    }
                 }
 
-                _playerHandManager.OnFieldChanged += OnPlayerFieldChanged;
+                yield return StartCoroutine(ResolvePlayerAceChoiceIfNeeded(entry));
+                _playerHandManager.AddNumberToField(entry);
                 _gameUI?.UpdatePlayerValue(_playerHandManager.FieldData, stage);
 
-                if (stage.maxHitCount > 0 && _hitCount >= stage.maxHitCount)
-                    _gameUI?.DisableGameButtons();
+                if (_blackjackManager.IsPlayerBust(_playerHandManager.FieldData, stage))
+                {
+                    _isProcessingHit = false;
+                    ExitPlayerTurn();
+                    StartCoroutine(DelayedTransition(_bustDelay, GameState.Result));
+                    yield break;
+                }
             }
             else
             {
-                if (stage.useOperatorCards || stage.operatorOnlyHit)
-                {
-                    _hitCount++;
-                    _playerHandManager.AddOperatorToHand(entry);
-
-                    if (stage.maxHitCount > 0 && _hitCount >= stage.maxHitCount)
-                        _gameUI?.DisableGameButtons();
-                }
-                else
-                {
-                    DrawAndProcess(retryCount + 1);
-                }
+                _hitCount++;
+                _playerHandManager.AddOperatorToHand(entry);
             }
+
+            if (stage.maxHitCount > 0 && _hitCount >= stage.maxHitCount)
+            {
+                _gameUI?.DisableGameButtons();
+            }
+            else
+            {
+                _gameUI?.EnableGameButtons();
+            }
+
+            _isProcessingHit = false;
+        }
+
+        private IEnumerator ResolvePlayerAceChoiceIfNeeded(DeckSO.CardEntry entry, bool disableButtons = false)
+        {
+            var stage = _stageManager.CurrentStage;
+            if (stage.stageIndex < 2 || entry == null || !entry.data.IsAce || entry.data.HasAceValueOverride) yield break;
+            if (_gameUI == null) { entry.data.SetAceValue(11); yield break; }
+
+            bool resolved = false;
+            _gameUI.ShowAceChoice(() => { entry.data.SetAceValue(1); resolved = true; }, () => { entry.data.SetAceValue(11); resolved = true; });
+            yield return new WaitUntil(() => resolved);
+            _gameUI.SetupGameButtons(OnHit, OnStand);
+            if (disableButtons) _gameUI.DisableGameButtons();
+        }
+
+        private void ExitPlayerTurn()
+        {
+            if (_gameUI != null)
+            {
+                _gameUI.OnHandCardClicked -= _playerHandManager.SelectHandCard;
+                _gameUI.OnOperatorDropped -= OnOperatorDropped;
+                _gameUI.DisableGameButtons();
+                _gameUI.DisableHandCardDrag();
+            }
+            _playerHandManager.ClearSelection();
         }
 
         private void OnStand()
         {
             if (_playerHandManager.Field.Count == 0) return;
-
-            if (_blackjackManager.IsFinalBust(
-                _playerHandManager.FieldData, _stageManager.CurrentStage))
-            {
-                _gameUI?.UpdatePlayerValue(
-                    _playerHandManager.FieldData, _stageManager.CurrentStage);
-                ExitPlayerTurn();
-                StartCoroutine(DelayedTransition(_bustDelay, GameState.Result));
-                return;
-            }
-
             ExitPlayerTurn();
             StartCoroutine(DelayedTransition(_standDelay, GameState.DealerTurn));
         }
 
-        private void OnOperatorSlotSelected(int slotIndex)
+        private void OnOperatorDropped(int slotIndex)
         {
             if (_playerHandManager.TryPlaceOperator(slotIndex, out DeckSO.CardEntry placed))
+            {
+                var stage = _stageManager.CurrentStage;
                 _gameUI?.PlaceOperatorOnSlot(slotIndex, placed.data.operatorType);
+                _gameUI?.UpdatePlayerValue(_playerHandManager.FieldData, stage);
+
+                if (_blackjackManager.IsPlayerBust(_playerHandManager.FieldData, stage))
+                {
+                    ExitPlayerTurn();
+                    StartCoroutine(DelayedTransition(_bustDelay, GameState.Result));
+                    return;
+                }
+
+                _gameUI?.EnableGameButtons();
+            }
         }
 
-        private System.Collections.IEnumerator DelayedTransition(
-            float delay, GameState next)
+        private IEnumerator DelayedTransition(float delay, GameState next)
         {
             yield return new WaitForSeconds(delay);
             TransitionTo(next);
@@ -442,125 +393,106 @@ namespace HTH
 
         // ─── 이벤트 핸들러 ───────────────────────────────────────
 
-        /// <summary>
-        /// 플레이어 필드에 새 숫자 카드가 추가됐을 때 호출됩니다.
-        /// 마지막으로 추가된 카드 1장만 UI에 추가합니다.
-        /// </summary>
         private void OnPlayerFieldChanged()
         {
             if (_playerHandManager.Field.Count == 0) return;
-
-            // 마지막으로 추가된 카드만 UI에 추가
             var last = _playerHandManager.Field[_playerHandManager.Field.Count - 1];
-            _gameUI?.AddPlayerFieldCard(last);
+            if (last.data.cardType == CardType.Number)
+                _gameUI?.AddPlayerFieldCard(last, _stageManager.CurrentStage.useOperatorCards);
             _gameUI?.UpdatePlayerValue(_playerHandManager.FieldData, _stageManager.CurrentStage);
         }
 
-        /// <summary>
-        /// 플레이어 손패에 새 연산자 카드가 추가됐을 때 호출됩니다.
-        /// 마지막으로 추가된 카드 1장만 UI에 추가합니다.
-        /// </summary>
         private void OnPlayerHandChanged()
         {
             if (_playerHandManager.Hand.Count == 0) return;
-
-            var last = _playerHandManager.Hand[_playerHandManager.Hand.Count - 1];
-            _gameUI?.AddHandCard(last);
+            _gameUI?.AddHandCard(_playerHandManager.Hand[_playerHandManager.Hand.Count - 1]);
         }
 
-        /// <summary>
-        /// 딜러 필드에 새 카드가 추가됐을 때 호출됩니다.
-        /// 마지막으로 추가된 카드 1장만 UI에 추가합니다.
-        /// </summary>
         private void OnDealerCardAdded(DeckSO.CardEntry entry, bool isHidden)
         {
             _gameUI?.AddDealerFieldCard(entry, isHidden);
+            if (!isHidden) _gameUI?.UpdateDealerValue(_dealerManager.FieldData, _stageManager.CurrentStage);
         }
 
-        private void OnDealerCardRevealed()
+        private void OnDealerOperatorPlaced(int index, DeckSO.CardEntry entry)
         {
-            _gameUI?.RevealDealerHiddenCard(); // ← 기존 카드 뒤집기
+            _gameUI?.InsertDealerFieldCard(index, entry);
+            _gameUI?.UpdateDealerValue(_dealerManager.FieldData, _stageManager.CurrentStage);
+        }
+
+        private void OnDealerCardRevealed(System.Action onComplete)
+        {
+            _gameUI?.RevealDealerHiddenCard(() => {
+                _gameUI?.UpdateDealerValue(_dealerManager.FieldData, _stageManager.CurrentStage);
+                onComplete?.Invoke();
+            });
         }
 
         private void OnDealerTurnEnded()
         {
-            _gameUI?.UpdateDealerValue(
-                _dealerManager.FieldData,
-                _stageManager.CurrentStage);
+            _gameUI?.UpdateDealerValue(_dealerManager.FieldData, _stageManager.CurrentStage);
             StartCoroutine(DelayedTransition(_resultDelay, GameState.Result));
         }
 
         private void OnVisionDepleted() => TransitionTo(GameState.GameOver);
-
-        private void OnHandSelectionChanged(int index)
-            => _gameUI?.HighlightHandCard(index);
-
-        private void OnSlotHighlightRequested(bool highlight)
-            => _gameUI?.HighlightAvailableSlots(highlight);
+        private void OnHandSelectionChanged(int idx) => _gameUI?.HighlightHandCard(idx);
+        private void OnSlotHighlightRequested(bool h) => _gameUI?.HighlightAvailableSlots(h);
 
         // ─── 플로우 ──────────────────────────────────────────────
 
-        private void OnStartGame()
-        {
-            _stageManager.ResetAndLoad();
-            LoadStage();
-            TransitionTo(GameState.Betting);
-        }
-
-        private void OnConfirmBet(int betAmount)
-        {
-            _visionManager.SetBet(betAmount);
-            TransitionTo(GameState.PlayerTurn);
-        }
-
+        private void OnStartGame() { _stageManager.ResetAndLoad(); LoadStage(); TransitionTo(GameState.Betting); }
+        private void OnConfirmBet(int bet) { _visionManager.SetBet(bet); TransitionTo(GameState.PlayerTurn); }
         private void OnStageWin()
         {
-            if (_stageManager.IsLastStage)
-            {
-                TransitionTo(GameState.StageClear);
-                return;
-            }
-            _stageManager.LoadNext();
-            LoadStage();
-            TransitionTo(GameState.Betting);
+            if (_stageManager.IsLastStage) TransitionTo(GameState.StageClear);
+            else { _stageManager.LoadNext(); LoadStage(); TransitionTo(GameState.Betting); }
         }
-
         private void OnStageLose()
         {
-            if (_visionManager.IsBlind())
-            {
-                TransitionTo(GameState.GameOver);
-                return;
-            }
-            _stageManager.ReloadCurrent();
-            LoadStage();
-            TransitionTo(GameState.Betting);
+            if (_visionManager.IsBlind()) TransitionTo(GameState.GameOver);
+            else { _stageManager.ReloadCurrent(); LoadStage(); TransitionTo(GameState.Betting); }
         }
-
-        private void OnRestartGame()
-        {
-            _stageManager.ResetAndLoad();
-            TransitionTo(GameState.Title);
-        }
+        private void OnRestartGame() => TransitionTo(GameState.Title);
 
         private void LoadStage()
         {
             _hitCount = 0;
             _playerHandManager.ResetAll();
             _dealerManager.ResetField();
-            _deckRunner = new DeckRunner(
-                _stageManager.CurrentStage.deck,
-                _stageManager.CurrentStage);
-
-            Debug.Log($"[GM] LoadStage — Stage {_stageManager.CurrentStage.stageIndex}");
+            _deckRunner = new DeckRunner(_stageManager.CurrentStage.deck, _stageManager.CurrentStage);
         }
 
-        // ─── 공개 API ─────────────────────────────────────────────
-
-        public void SetDealerStrategy(IDealerStrategy strategy)
+        private IEnumerator DealInitialCardsRoutine()
         {
-            _dealerStrategy = strategy;
-            _blackjackManager.SetDealerStrategy(strategy);
+            // 1. 공통 인트로 (플레이어 2장, 딜러 2장)
+            if (_deckRunner.TryDraw(out var p1)) { yield return StartCoroutine(ResolvePlayerAceChoiceIfNeeded(p1, true)); _playerHandManager.AddNumberToField(p1); }
+            yield return new WaitForSeconds(_dealInterval);
+            if (_deckRunner.TryDraw(out var d1)) _dealerManager.AddOpenCard(d1);
+            yield return new WaitForSeconds(_dealInterval);
+            if (_deckRunner.TryDraw(out var p2)) { yield return StartCoroutine(ResolvePlayerAceChoiceIfNeeded(p2, true)); _playerHandManager.AddNumberToField(p2); }
+            yield return new WaitForSeconds(_dealInterval);
+            if (_deckRunner.TryDraw(out var d2)) _dealerManager.SetHiddenCard(d2);
+
+            // 2. operatorOnlyHit일 경우 남은 숫자 카드 모두 지급
+            if (_stageManager.CurrentStage.operatorOnlyHit)
+            {
+                yield return new WaitForSeconds(_dealInterval);
+                yield return StartCoroutine(DealAllNumberCardsRoutine());
+            }
         }
+
+        private IEnumerator DealAllNumberCardsRoutine()
+        {
+            while (_deckRunner.Remaining > 0)
+            {
+                if (!_deckRunner.TryDraw(out var entry)) break;
+                if (entry.data.cardType == CardType.Number) { yield return StartCoroutine(ResolvePlayerAceChoiceIfNeeded(entry, true)); _playerHandManager.AddNumberToField(entry); yield return new WaitForSeconds(_dealInterval); }
+                else _pendingOperators.Add(entry);
+            }
+            foreach (var op in _pendingOperators) _deckRunner.ReturnCard(op);
+            _pendingOperators.Clear();
+        }
+
+        public void SetDealerStrategy(IDealerStrategy s) { _dealerStrategy = s; _blackjackManager.SetDealerStrategy(s); }
     }
 }

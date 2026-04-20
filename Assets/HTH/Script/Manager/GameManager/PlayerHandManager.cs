@@ -5,7 +5,10 @@ namespace HTH
 {
     /// <summary>
     /// 플레이어 필드, 손패, 연산자 배치 인터랙션을 담당합니다.
-    /// DeckSO.CardEntry(data + suit + suitData)로 카드 한 장을 관리합니다.
+    ///
+    /// 손패(Hand)는 연산자 카드 최대 1장만 보유합니다.
+    /// 버리기는 선택 여부와 관계없이 Hand에 카드가 있으면 실행됩니다.
+    /// 슬롯 배치는 Hand[0]을 직접 사용합니다.
     /// </summary>
     public class PlayerHandManager : MonoBehaviour
     {
@@ -14,42 +17,57 @@ namespace HTH
         public List<DeckSO.CardEntry> Hand { get; private set; } = new();
 
         private readonly Dictionary<int, DeckSO.CardEntry> _placedOperators = new();
-        private int _selectedHandIndex = -1;
+
+        // ─── 선택 상태 ────────────────────────────────────────────
+        // 손패는 0장 또는 1장이므로 선택 = Hand[0] 선택 여부
+        private bool _isHandSelected = false;
 
         // ─── 이벤트 ──────────────────────────────────────────────
-        /// <summary>필드에 카드가 추가될 때 발행</summary>
         public event System.Action OnFieldChanged;
-
-        /// <summary>손패에 카드가 추가될 때 발행 — GameManager.OnPlayerHandChanged가 구독</summary>
         public event System.Action OnHandChanged;
-
-        /// <summary>손패 카드 선택 상태 변경 시 발행 (-1=해제)</summary>
         public event System.Action<int> OnHandSelectionChanged;
-
-        /// <summary>슬롯 하이라이트 요청 시 발행</summary>
         public event System.Action<bool> OnSlotHighlightRequested;
 
         // ─── 변환 헬퍼 ───────────────────────────────────────────
-        /// <summary>BlackjackManager / ExpressionEvaluator용 CardDataSO 목록</summary>
         public List<CardDataSO> FieldData => Field.ConvertAll(e => e.data);
-
-        /// <summary>BlackjackManager / ExpressionEvaluator용 손패 CardDataSO 목록</summary>
         public List<CardDataSO> HandData => Hand.ConvertAll(e => e.data);
+
+        // ─── 읽기 전용 ────────────────────────────────────────────
+        /// <summary>손패에 카드가 있는지 여부</summary>
+        public bool HasHandCard => Hand.Count > 0;
+
+        /// <summary>새 연산자 카드를 받을 수 있는지 여부</summary>
+        public bool CanReceiveOperatorCard
+        {
+            get
+            {
+                if (HasHandCard) return false;
+
+                int numberCount = 0;
+                foreach (var entry in Field)
+                    if (entry.data.cardType == CardType.Number)
+                        numberCount++;
+
+                int availableSlotCount = numberCount - 1 - _placedOperators.Count;
+                return availableSlotCount > 0;
+            }
+        }
+
+        /// <summary>현재 선택 인덱스 (-1 = 미선택)</summary>
+        public int SelectedHandIndex => _isHandSelected ? 0 : -1;
 
         // ─── 초기화 ───────────────────────────────────────────────
 
-        /// <summary>라운드 시작 시 모든 상태를 초기화합니다.</summary>
         public void ResetAll()
         {
             Field.Clear();
             Hand.Clear();
             _placedOperators.Clear();
-            _selectedHandIndex = -1;
+            _isHandSelected = false;
         }
 
         // ─── 카드 추가 ────────────────────────────────────────────
 
-        /// <summary>숫자 카드를 필드에 추가합니다.</summary>
         public void AddNumberToField(DeckSO.CardEntry entry)
         {
             Field.Add(entry);
@@ -58,47 +76,59 @@ namespace HTH
 
         /// <summary>
         /// 연산자 카드를 손패에 추가합니다.
-        /// OnHandChanged를 발행해 GameManager가 UI에 카드 1장만 추가하도록 합니다.
+        /// 손패는 1장만 허용합니다.
         /// </summary>
         public void AddOperatorToHand(DeckSO.CardEntry entry)
         {
+            if (Hand.Count >= 1)
+            {
+                Debug.LogWarning("[PHM] 손패에 이미 연산자 카드가 있습니다.");
+                return;
+            }
+
             Hand.Add(entry);
-            OnHandChanged?.Invoke(); // ← OnFieldChanged가 아닌 OnHandChanged 발행
+            OnHandChanged?.Invoke();
         }
 
-        // ─── 연산자 배치 인터랙션 ─────────────────────────────────
+        // ─── 연산자 선택 ──────────────────────────────────────────
 
         /// <summary>
         /// 손패 카드 선택 처리.
-        /// 같은 카드 재클릭 시 선택을 해제합니다.
+        /// 재클릭 시 선택 해제.
+        /// 손패가 없으면 무시합니다.
         /// </summary>
         public void SelectHandCard(int handIndex)
         {
-            if (handIndex < 0 || handIndex >= Hand.Count) return;
+            // 손패가 없으면 무시
+            if (Hand.Count == 0) return;
 
-            if (_selectedHandIndex == handIndex)
+            // 재클릭 시 선택 해제
+            if (_isHandSelected)
             {
-                _selectedHandIndex = -1;
+                _isHandSelected = false;
                 OnHandSelectionChanged?.Invoke(-1);
                 OnSlotHighlightRequested?.Invoke(false);
                 return;
             }
 
-            _selectedHandIndex = handIndex;
-            OnHandSelectionChanged?.Invoke(handIndex);
+            // 선택
+            _isHandSelected = true;
+            OnHandSelectionChanged?.Invoke(0);
             OnSlotHighlightRequested?.Invoke(true);
         }
 
+        // ─── 연산자 배치 ──────────────────────────────────────────
+
         /// <summary>
         /// 연산자를 필드 슬롯에 배치합니다.
-        /// slotIndex는 숫자 카드 기준 인덱스입니다.
-        /// (슬롯0 = 첫번째와 두번째 숫자 사이)
+        /// 선택 여부와 관계없이 Hand[0]을 사용합니다.
         /// </summary>
         public bool TryPlaceOperator(int slotIndex, out DeckSO.CardEntry placedEntry)
         {
             placedEntry = null;
 
-            if (_selectedHandIndex < 0) return false;
+            // 손패 없으면 불가
+            if (Hand.Count == 0) return false;
 
             int numberCount = 0;
             foreach (var entry in Field)
@@ -107,25 +137,21 @@ namespace HTH
             if (slotIndex < 0 || slotIndex >= numberCount - 1) return false;
             if (_placedOperators.ContainsKey(slotIndex)) return false;
 
-            placedEntry = Hand[_selectedHandIndex];
+            // Hand[0] 직접 사용
+            placedEntry = Hand[0];
             _placedOperators[slotIndex] = placedEntry;
 
-            Hand.RemoveAt(_selectedHandIndex);
-            _selectedHandIndex = -1;
+            Hand.RemoveAt(0);
+            _isHandSelected = false;
 
             OnHandSelectionChanged?.Invoke(-1);
             OnSlotHighlightRequested?.Invoke(false);
 
             RebuildFieldExpression();
-            OnFieldChanged?.Invoke();
 
             return true;
         }
 
-        /// <summary>
-        /// _placedOperators를 반영해 Field를 재구성합니다.
-        /// 숫자 카드 사이에 연산자를 끼워넣습니다.
-        /// </summary>
         private void RebuildFieldExpression()
         {
             var numberEntries = new List<DeckSO.CardEntry>();
@@ -146,22 +172,38 @@ namespace HTH
             var log = new System.Text.StringBuilder("[PHM] RebuildField — ");
             foreach (var entry in Field)
                 log.Append($"{entry.data.displayLabel} ");
-            UnityEngine.Debug.Log(log.ToString());
+            Debug.Log(log.ToString());
+        }
+
+        // ─── 버리기 ──────────────────────────────────────────────
+
+        /// <summary>
+        /// 손패 연산자 카드를 버립니다.
+        /// 선택 여부와 관계없이 Hand에 카드가 있으면 버립니다.
+        /// </summary>
+        public void DiscardLastOperator()
+        {
+            if (Hand.Count == 0)
+            {
+                Debug.LogWarning("[PHM] 버릴 카드가 없습니다.");
+                return;
+            }
+
+            Hand.RemoveAt(0);
+            _isHandSelected = false;
+
+            OnHandSelectionChanged?.Invoke(-1);
+            OnSlotHighlightRequested?.Invoke(false);
+            OnHandChanged?.Invoke();
         }
 
         // ─── 선택 해제 ────────────────────────────────────────────
 
-        /// <summary>손패 선택 상태와 슬롯 하이라이트를 해제합니다.</summary>
         public void ClearSelection()
         {
-            _selectedHandIndex = -1;
+            _isHandSelected = false;
             OnHandSelectionChanged?.Invoke(-1);
             OnSlotHighlightRequested?.Invoke(false);
         }
-
-        // ─── 읽기 전용 접근 ───────────────────────────────────────
-
-        /// <summary>현재 선택된 손패 인덱스. -1 = 미선택</summary>
-        public int SelectedHandIndex => _selectedHandIndex;
     }
 }

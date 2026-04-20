@@ -1,5 +1,7 @@
-﻿using System;
+using System;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace HTH
 {
@@ -48,61 +50,138 @@ namespace HTH
             CurrentVision = _maxVision;
             CurrentBet = 0;
         }
+        private Vignette _vignette;
+        private Coroutine _vignetteCoroutine;
+        
+        private void Start()
+        {
+            // 1. 기존 테스트 코드와 동일하게 메인 카메라 내에서 먼저 확인
+            if (Camera.main != null)
+            {
+                Volume camVolume = Camera.main.GetComponentInChildren<Volume>();
+                if (camVolume != null && camVolume.profile != null && camVolume.profile.TryGet(out _vignette))
+                {
+                    Debug.Log($"[VisionManager] 카메라 내부에서 Vignette 효과를 찾았습니다! ({camVolume.gameObject.name})");
+                    return;
+                }
+            }
+
+            // 2. 못 찾았을 경우 씬 전체 탐색
+            Volume[] volumes = FindObjectsByType<Volume>(FindObjectsSortMode.None);
+            foreach (var vol in volumes)
+            {
+                if (vol.profile != null && vol.profile.TryGet(out _vignette))
+                {
+                    Debug.Log($"[VisionManager] 씬에서 Vignette 효과를 찾았습니다! ({vol.gameObject.name})");
+                    return;
+                }
+            }
+
+            Debug.LogWarning("[VisionManager] 씬에서 Vignette(비네뜨) 효과가 포함된 Volume을 찾을 수 없습니다.");
+        }
+
         private void OnEnable()
         {
-            if (VisionManager.Instance != null)
-                VisionManager.Instance.OnVisionChanged += HandleVisionChanged;
+            OnVisionChanged += HandleVisionChanged;
         }
 
         private void OnDisable()
         {
-            if (VisionManager.Instance != null)
-                VisionManager.Instance.OnVisionChanged -= HandleVisionChanged;
+            OnVisionChanged -= HandleVisionChanged;
         }
 
-        /// <summary>VisionManager.OnVisionChanged 구독 핸들러.</summary>
+        /// <summary>VisionManager.OnVisionChanged 구독 핸들러 (UI 갱신용 등).</summary>
         private void HandleVisionChanged(int current, int max)
         {
-            // TODO: UpdateVisionBar(current, max);
-            // TODO: UpdateVignetteEffect((float)current / max);
             Debug.Log($"[GameUI] Vision — {current}/{max}");
         }
 
+        private void ApplyVignetteEffect()
+        {
+            if (_vignette == null)
+            {
+                Volume vol = FindAnyObjectByType<Volume>();
+                if (vol != null && vol.profile != null)
+                {
+                    vol.profile.TryGet(out _vignette);
+                    Debug.Log($"[VisionManager] Apply 시점에 비네뜨 재검색 성공! ({vol.gameObject.name})");
+                }
+            }
+
+            // 시야 비율 계산 (1.0 = 풀 시야, 0.0 = 시야 없음)
+            float visionRatio = (float)CurrentVision / MaxVision;
+            float targetVignette = 1.0f - visionRatio;
+            
+            // FOV 계산: 시야가 100%일 때 60, 0%일 때 125
+            float targetFOV = Mathf.Lerp(125f, 60f, visionRatio);
+            
+            if (_vignetteCoroutine != null) StopCoroutine(_vignetteCoroutine);
+            _vignetteCoroutine = StartCoroutine(SmoothVisionRoutine(targetVignette, targetFOV, 1.0f));
+        }
+
+        private System.Collections.IEnumerator SmoothVisionRoutine(float targetVignette, float targetFOV, float duration)
+        {
+            float startVignette = _vignette != null ? _vignette.intensity.value : 0f;
+            float startFOV = Camera.main != null ? Camera.main.fieldOfView : 60f;
+            float elapsed = 0f;
+
+            if (_vignette != null)
+            {
+                _vignette.active = true;
+                _vignette.intensity.overrideState = true;
+            }
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+
+                // 비네트 적용
+                if (_vignette != null)
+                {
+                    _vignette.intensity.value = Mathf.Lerp(startVignette, targetVignette, t);
+                }
+
+                // FOV 적용
+                if (Camera.main != null)
+                {
+                    Camera.main.fieldOfView = Mathf.Lerp(startFOV, targetFOV, t);
+                }
+
+                yield return null;
+            }
+
+            if (_vignette != null) _vignette.intensity.value = targetVignette;
+            if (Camera.main != null) Camera.main.fieldOfView = targetFOV;
+            
+            _vignetteCoroutine = null;
+            Debug.Log($"[VisionManager] 시각 연출 완료 — Vignette:{targetVignette:F2}, FOV:{targetFOV:F1}");
+        }
+
         // ─── 배팅 API ─────────────────────────────────────────────
-        /// <summary>
-        /// 배팅할 시야량을 설정합니다.
-        /// 최소 1, 최대 현재 보유 시야로 자동 클램핑됩니다.
-        /// </summary>
+        
         public void SetBet(int amount)
         {
             CurrentBet = Mathf.Clamp(amount, 1, CurrentVision);
         }
 
-        /// <summary>
-        /// 배팅 가능 여부를 확인합니다.
-        /// 스테이지 최소 배팅량 이상의 시야를 보유하고 있어야 합니다.
-        /// </summary>
         public bool CanBet(int minimumBet) => CurrentVision >= minimumBet;
 
-        /// <summary>
-        /// 승리 처리: 배팅한 시야를 유지합니다.
-        /// 시야는 차감되지 않으며 배팅량만 초기화됩니다.
-        /// </summary>
         public void WinBet()
         {
             CurrentBet = 0;
             OnVisionChanged?.Invoke(CurrentVision, _maxVision);
+            ApplyVignetteEffect();
         }
 
-        /// <summary>
-        /// 패배 처리: 배팅한 시야를 영구 차감합니다.
-        /// 시야가 0 이하가 되면 OnVisionDepleted를 발행합니다.
-        /// </summary>
         public void LoseBet()
         {
             CurrentVision = Mathf.Max(0, CurrentVision - CurrentBet);
             CurrentBet = 0;
             OnVisionChanged?.Invoke(CurrentVision, _maxVision);
+            
+            Debug.Log($"[VisionManager] LoseBet 호출 완료! 현재 시야: {CurrentVision}/{_maxVision}");
+            ApplyVignetteEffect();
 
             if (CurrentVision <= 0)
                 OnVisionDepleted?.Invoke();
@@ -121,6 +200,7 @@ namespace HTH
             CurrentVision = _maxVision;
             CurrentBet = 0;
             OnVisionChanged?.Invoke(CurrentVision, _maxVision);
+            ApplyVignetteEffect();
         }
     }
 }

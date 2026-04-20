@@ -109,6 +109,7 @@ namespace HTH
                     if (mb == null) continue;
 
                     mb.transform.DOKill();
+                    AudioManager.instance.PlaySfx(AudioManager.Sfx.cardReturn);
                     // SetLink를 추가하여 파괴 시 트윈이 안전하게 종료되도록 함
                     mb.transform.DOMove(_deckReturnPoint.position, _collectMoveDuration)
                         .SetEase(Ease.InQuad)

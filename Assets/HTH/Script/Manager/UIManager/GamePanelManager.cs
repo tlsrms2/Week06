@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Video;
 using DG.Tweening;
+using System.Collections;
 
 namespace HTH
 {
@@ -50,9 +51,18 @@ namespace HTH
             SetGameButtonLabel(_stayButton, "STAY");
 
             _hitButton.onClick.RemoveAllListeners();
-            _hitButton.onClick.AddListener(() => onHit?.Invoke());
+            _hitButton.onClick.AddListener(() =>
+            {
+                onHit?.Invoke();
+                AudioManager.instance.PlaySfx(AudioManager.Sfx.hit);
+            });
             _stayButton.onClick.RemoveAllListeners();
-            _stayButton.onClick.AddListener(() => onStand?.Invoke());
+            _stayButton.onClick.AddListener(() =>
+            {
+                onStand?.Invoke();
+                AudioManager.instance.PlaySfx(AudioManager.Sfx.stay);
+            });
+
         }
 
         /// <summary>Hit / Stay 버튼을 활성화합니다.</summary>
@@ -78,34 +88,28 @@ namespace HTH
         {
             _pauseManager?.Block();
 
-            // [추가] 페이드 효과가 설정되어 있다면 먼저 어둡게 만듦
-            if (_fadeOverlay != null)
+            _fadeOverlay.gameObject.SetActive(true);
+            _fadeOverlay.color = new Color(0, 0, 0, 0);
+            _fadeOverlay.DOFade(1f, _gameOverFadeDuration).OnComplete(() =>
             {
-                _fadeOverlay.gameObject.SetActive(true);
-                _fadeOverlay.color = new Color(0, 0, 0, 0);
-                _fadeOverlay.DOFade(1f, _gameOverFadeDuration).OnComplete(() => 
+                _gameOverPanel?.SetActive(true);
+                _gameOverImage?.gameObject.SetActive(true);
+                _fadeOverlay.gameObject.SetActive(false);
+
+                _videoPlayer?.Play(() =>
                 {
-                    ProceedToShowGameOver(onRestart);
+                    _pauseManager?.Unblock();
+                    AudioManager.instance.PlaySfx(AudioManager.Sfx.Ending);
                 });
-            }
-            else
-            {
-                ProceedToShowGameOver(onRestart);
-            }
+            });
+
+            StartCoroutine(ProceedToShowGameOver(onRestart));
         }
 
-        private void ProceedToShowGameOver(Action onRestart)
+        IEnumerator ProceedToShowGameOver(Action onRestart)
         {
-            // [수정] 영상과 패널이 보여야 하므로 암전용 가림막을 비활성화합니다.
-            if (_fadeOverlay != null) _fadeOverlay.gameObject.SetActive(false);
-
-            _gameOverPanel?.SetActive(true);
-            _gameOverImage?.gameObject.SetActive(true);
-            _videoPlayer?.Play(() =>
-            {
-                _pauseManager?.Unblock();
-                BindRestart(onRestart);
-            });
+            yield return null;
+            //BindRestart(onRestart);
         }
 
         /// <summary>스테이지 클리어 패널을 표시합니다.</summary>

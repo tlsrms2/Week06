@@ -93,7 +93,11 @@ namespace HTH
             _dealerManager.OnDealerOperatorPlaced += OnDealerOperatorPlaced;
         }
 
-        private void Start() => TransitionTo(GameState.Title);
+        private void Start()
+        {
+            AudioManager.instance.PlayBgm(AudioManager.Bgm.ingame);
+            TransitionTo(GameState.Title);
+        }
 
         private float _lastHitTime = -1f;
 
@@ -145,7 +149,7 @@ namespace HTH
         {
             var stage = _stageManager.CurrentStage;
             if (_visionManager.CurrentVision <= 0)
-            {
+            { 
                 TransitionTo(GameState.GameOver);
                 return;
             }

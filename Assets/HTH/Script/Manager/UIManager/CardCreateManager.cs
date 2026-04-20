@@ -206,7 +206,7 @@ namespace HTH
         private IEnumerator MovePlayerCard(GameObject go, Card3DView view, Transform parent, Vector3 targetLocalPos, Action OnArrived)
         {
             if (go == null) yield break;
-
+            AudioManager.instance.PlaySfx(AudioManager.Sfx.cardSlide);
             // 1. 덱 → 중앙
             var centerPos = _centerPoint != null ? _centerPoint.position : Vector3.zero;
 
@@ -216,6 +216,7 @@ namespace HTH
 
             // 2. 중앙에서 뒤집기 애니메이션
             yield return StartCoroutine(FlipCard(go, view, _flipDuration));
+            AudioManager.instance.PlaySfx(AudioManager.Sfx.cardFlip);
 
             if (go == null) yield break;
 

@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using DG.Tweening;
+using NUnit.Framework.Constraints;
 
 namespace HTH
 {
@@ -75,7 +76,7 @@ namespace HTH
         public void Show() => _fieldPanelRoot?.SetActive(true);
         public void Hide() => _fieldPanelRoot?.SetActive(false);
 
-        // ─── 카드 수거 연출 ───────────────────────────────────────
+        // ─── 카드 전체 회수 연출 ───────────────────────────────────────
 
         /// <summary>
         /// 필드와 손패의 모든 카드를 순차적으로 덱 위치로 되돌리며 파괴합니다.
@@ -101,11 +102,16 @@ namespace HTH
                 // 덱 위치가 지정되어 있다면 이동 연출
                 if (_deckReturnPoint != null)
                 {
+                    StartCoroutine(RecollCard(mb, view));
+
+                    yield return new WaitForSeconds(0.2f);
+                    if (mb == null) continue;
+
                     mb.transform.DOKill();
-                    // 월드 좌표로 이동
-                    mb.transform.DOMove(_deckReturnPoint.position, _collectMoveDuration).SetEase(Ease.InQuad);
-                    // 회전도 덱 방향에 맞춰주면 좋음 (필요 시)
-                    mb.transform.DORotateQuaternion(_deckReturnPoint.rotation * Quaternion.Euler(0, 180f, 0), _collectMoveDuration);
+                    // SetLink를 추가하여 파괴 시 트윈이 안전하게 종료되도록 함
+                    mb.transform.DOMove(_deckReturnPoint.position, _collectMoveDuration)
+                        .SetEase(Ease.InQuad)
+                        .SetLink(mb.gameObject);
                     
                     // 이동 완료 후 파괴
                     Destroy(mb.gameObject, _collectMoveDuration);
@@ -121,6 +127,23 @@ namespace HTH
 
             // 모든 카드가 수거될 때까지 대기 (마지막 카드 이동 시간 고려)
             yield return new WaitForSeconds(_collectMoveDuration);
+        }
+        IEnumerator RecollCard(MonoBehaviour go, ICardView view)
+        {
+            if (go == null) yield break;
+
+            var startRot = go.transform.rotation;
+            var endRot = startRot * Quaternion.Euler(0f, -180f, 0f);
+            float elapsed = 0f;
+
+            while (elapsed < 0.3f)
+            {
+                if (go == null) yield break;
+                elapsed += Time.deltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, elapsed / 0.3f);
+                go.transform.rotation = Quaternion.Slerp(startRot, endRot, t);
+                yield return null;
+            }
         }
 
         // ─── 플레이어 필드 (3D) ───────────────────────────────────
@@ -554,7 +577,10 @@ namespace HTH
                 float y = -row * spacingY;
 
                 mb.transform.DOKill();
-                mb.transform.DOLocalMove(new Vector3(x, y, 0f), 0.15f).SetEase(Ease.OutQuad);
+                // SetLink를 추가하여 파괴 시 트윈이 안전하게 종료되도록 함
+                mb.transform.DOLocalMove(new Vector3(x, y, 0f), 0.15f)
+                    .SetEase(Ease.OutQuad)
+                    .SetLink(mb.gameObject);
             }
         }
 

@@ -99,7 +99,6 @@ namespace HTH
 
         private void OnDestroy()
         {
-            if (_visionManager != null) _visionManager.OnVisionDepleted -= OnVisionDepleted;
             if (_playerHandManager != null)
             {
                 _playerHandManager.OnFieldChanged -= OnPlayerFieldChanged;
@@ -145,15 +144,16 @@ namespace HTH
         private void OnEnterBetting()
         {
             var stage = _stageManager.CurrentStage;
-            if (!_visionManager.CanBet(stage.visionBetMin))
+            if (_visionManager.CurrentVision <= 0)
             {
                 TransitionTo(GameState.GameOver);
                 return;
             }
             
-            // 스테이지의 최대 베팅 제한과 현재 시야 중 작은 값을 한도로 설정
+            // 스테이지의 최소/최대 베팅 제한과 현재 시야 중 작은 값을 한도로 설정
+            int betMin = Mathf.Min(stage.visionBetMin, _visionManager.CurrentVision);
             int betMax = Mathf.Min(stage.visionBetMax, _visionManager.CurrentVision);
-            UI_ShowBetting(stage.visionBetMin, betMax, OnConfirmBet);
+            UI_ShowBetting(betMin, betMax, OnConfirmBet);
         }
 
         private void OnEnterPlayerTurn()
@@ -264,6 +264,7 @@ namespace HTH
 
         private void OnHit()
         {
+            if (_playerHandManager.HasHandCard) return;
             if (_isProcessingHit || (Time.time < _lastHitTime + _hitCooldown)) return;
             
             _lastHitTime = Time.time;
@@ -322,7 +323,7 @@ namespace HTH
                         _gameUI?.EnableHandCardDrag(); // UI 패널 대신 드래그 활성화
                         
                         _isProcessingHit = false;
-                        _gameUI?.EnableGameButtons();
+                        // 조커가 손패에 들어왔으므로 버튼을 활성화하지 않고 종료
                         yield break;
                     }
                 }
@@ -349,7 +350,7 @@ namespace HTH
             {
                 _gameUI?.DisableGameButtons();
             }
-            else
+            else if (!_playerHandManager.HasHandCard)
             {
                 _gameUI?.EnableGameButtons();
             }
@@ -367,7 +368,7 @@ namespace HTH
             _gameUI.ShowAceChoice(() => { entry.data.SetAceValue(1); resolved = true; }, () => { entry.data.SetAceValue(11); resolved = true; });
             yield return new WaitUntil(() => resolved);
             _gameUI.SetupGameButtons(OnHit, OnStand);
-            if (disableButtons) _gameUI.DisableGameButtons();
+            if (disableButtons || _playerHandManager.HasHandCard) _gameUI.DisableGameButtons();
         }
 
         private void ExitPlayerTurn()
@@ -384,6 +385,7 @@ namespace HTH
 
         private void OnStand()
         {
+            if (_playerHandManager.HasHandCard) return;
             if (_playerHandManager.Field.Count == 0) return;
             ExitPlayerTurn();
             StartCoroutine(DelayedTransition(_standDelay, GameState.DealerTurn));
@@ -457,7 +459,20 @@ namespace HTH
             StartCoroutine(DelayedTransition(_resultDelay, GameState.Result));
         }
 
-        private void OnVisionDepleted() => TransitionTo(GameState.GameOver);
+        private void OnVisionDepleted()
+        {
+            var jumpScareManager = Object.FindAnyObjectByType<JumpScareManager>();
+            if (jumpScareManager != null)
+            {
+                // 점프스케어 연출 실행 후 게임 오버 패널 띄우기
+                StartCoroutine(jumpScareManager.PlayRandomJumpScareRoutine(() => TransitionTo(GameState.GameOver)));
+            }
+            else
+            {
+                TransitionTo(GameState.GameOver);
+            }
+        }
+
         private void OnHandSelectionChanged(int idx) => _gameUI?.HighlightHandCard(idx);
         private void OnSlotHighlightRequested(bool h) => _gameUI?.HighlightAvailableSlots(h);
 

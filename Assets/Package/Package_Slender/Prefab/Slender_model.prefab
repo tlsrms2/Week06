@@ -1172,7 +1172,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1010010733671478586}
   m_Layer: 0
-  m_Name: Slender_model
+  m_Name: Slender_Model
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2011,14 +2011,14 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6802351089155006130}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.581932, y: -0.21917595, z: 0.6893135, w: 0.37170437}
-  m_LocalPosition: {x: 0.00307, y: 0.00765, z: 0.00619}
+  m_LocalRotation: {x: 0.38601106, y: -0.0019427845, z: -0.005010682, w: 0.9224785}
+  m_LocalPosition: {x: 0.00000017807368, y: 0.0051925783, z: 2.2351741e-10}
   m_LocalScale: {x: 1, y: 1.0000001, z: 1.0000001}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8351011828139065900}
   m_Father: {fileID: 456076949434652341}
-  m_LocalEulerAnglesHint: {x: 47.288, y: 70.481, z: 157.704}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6866848364002821124
 GameObject:
   m_ObjectHideFlags: 0
